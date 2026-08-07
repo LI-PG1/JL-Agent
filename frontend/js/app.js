@@ -13,8 +13,11 @@
   }
   function monthToInput(v) { return (v || "").replace(".", "-"); }
   function inputToMonth(v) { return (v || "").replace("-", "."); }
-  function lines(v) { return String(v || "").split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean); }
   function list(v) { return String(v || "").split(/[,，、]/).map(function (s) { return s.trim(); }).filter(Boolean); }
+  // r3：自然描述 → 按「空行」分段（连续换行不拆分），每段作为一条待 AI 润色文本
+  function paragraphs(v) {
+    return String(v || "").split(/\n\s*\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+  }
   function errMsg(j) {
     if (j && j.message) return j.message;
     if (j && Array.isArray(j.detail)) {
@@ -102,7 +105,9 @@
       $id("cur-resume").textContent = ((j.data.basicInfo || {}).name || "未命名");
       $id("btn-generate").disabled = false;
       loadList();
-    }).catch(function (e) { alert("打开简历失败：" + e.message); });
+    }).catch(function (e) {
+      Adapt.showBanner("打开简历失败：" + e.message, true);
+    });
   }
 
   /* ---------------- 表单行模板 ---------------- */
@@ -111,6 +116,7 @@
   var CATS = [["专业技能", "专业技能"], ["工具与框架", "工具与框架"], ["语言能力", "语言能力"],
               ["算法与模型", "算法与模型"], ["数据与统计", "数据与统计"], ["工程实践", "工程实践"],
               ["证书资质", "证书资质"], ["兴趣爱好", "兴趣爱好"], ["其他能力", "其他能力"]];
+  // r2/r3：职责/要点整行 + 高度 ×3；允许自然描述（每行一条 → 自然语言，AI 后续润色加工）
   var ROW_TMPL = {
     edu: '<div class="grid">' +
       '<label>学校<input class="in-school" maxlength="64"></label>' +
@@ -124,7 +130,7 @@
       '<label>职位<input class="in-position" maxlength="64"></label>' +
       '<label>开始<input class="in-start" type="month" required></label>' +
       '<label>结束<input class="in-end" type="month" required></label>' +
-      '<label class="full">职责（每行一条）<textarea class="in-duties" rows="3" maxlength="2000"></textarea></label>' +
+      '<label class="full">职责（自然描述，AI 将自动润色整理）<textarea class="in-duties" rows="9" maxlength="4000"></textarea></label>' +
       '</div>',
     proj: '<div class="grid">' +
       '<label>项目名称<input class="in-name" maxlength="64"></label>' +
@@ -132,7 +138,7 @@
       '<label>开始<input class="in-start" type="month"></label>' +
       '<label>结束<input class="in-end" type="month"></label>' +
       '<label class="full">技术栈（逗号分隔）<input class="in-stack" maxlength="300"></label>' +
-      '<label class="full">要点（每行一条）<textarea class="in-items" rows="4" maxlength="3000"></textarea></label>' +
+      '<label class="full">要点（自然描述，AI 将自动润色整理）<textarea class="in-items" rows="12" maxlength="6000"></textarea></label>' +
       '</div>',
     skill: '<div class="grid">' +
       '<label>分类<select class="in-category"></select></label>' +
@@ -148,6 +154,35 @@
       '<label class="full">JD 原文<textarea class="in-jd" rows="5" maxlength="20000"></textarea></label>' +
       '</div>',
   };
+  // r1：条目自动编号（按添加时间先后 = DOM 顺序）；实习/项目独立前缀
+  var IDX_NUMS = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"];
+
+  function reindex(sec) {
+    var prefix = sec === "int" ? "实习" : (sec === "proj" ? "项目" : "");
+    if (!prefix) return;
+    var rows = $id(sec + "-rows").querySelectorAll(".row");
+    rows.forEach(function (row, i) {
+      var tag = row.querySelector(".idx");
+      if (!tag) {
+        tag = document.createElement("span");
+        tag.className = "idx";
+        row.insertBefore(tag, row.firstChild);
+      }
+      tag.textContent = prefix + (IDX_NUMS[i] || (i + 1));
+    });
+  }
+
+  // r5：数量上限 → 添加按钮自动禁用（教育 3 / 实习 2 / JD 5）
+  var SEC_MAX = { edu: 3, int: 2, job: 5 };
+
+  function updateAddBtns() {
+    Object.keys(SEC_MAX).forEach(function (sec) {
+      var btn = document.querySelector('[data-add="' + sec + '"]');
+      if (!btn) return;
+      var n = $id(sec + "-rows").querySelectorAll(".row").length;
+      btn.disabled = n >= SEC_MAX[sec];
+    });
+  }
 
   function addRow(sec, data) {
     var box = $id(sec + "-rows");
@@ -157,7 +192,11 @@
     var rm = document.createElement("span");
     rm.className = "rm";
     rm.textContent = "移除";
-    rm.addEventListener("click", function () { box.removeChild(div); });
+    rm.addEventListener("click", function () {
+      box.removeChild(div);
+      reindex(sec);
+      updateAddBtns();
+    });
     div.appendChild(rm);
     // 下拉选项
     if (sec === "edu") {
@@ -188,11 +227,15 @@
       var st = div.querySelector(".in-start"); if (st && data.startMonth) st.value = monthToInput(data.startMonth);
       var en = div.querySelector(".in-end"); if (en && data.endMonth) en.value = monthToInput(data.endMonth);
       var stack = div.querySelector(".in-stack"); if (stack && data.techStack) stack.value = (data.techStack || []).join("、");
-      var duties = div.querySelector(".in-duties"); if (duties && data.duties) duties.value = (data.duties || []).map(function (d) { return d.text; }).join("\n");
-      var items = div.querySelector(".in-items"); if (items && data.items) items.value = (data.items || []).map(function (i) { return i.text; }).join("\n");
+      var duties = div.querySelector(".in-duties");
+      if (duties && data.duties) duties.value = (data.duties || []).map(function (d) { return d.text; }).join("\n");
+      var items = div.querySelector(".in-items");
+      if (items && data.items) items.value = (data.items || []).map(function (i) { return i.text; }).join("\n");
       var jd = div.querySelector(".in-jd"); if (jd && data.jdText) jd.value = data.jdText;
     }
     box.appendChild(div);
+    reindex(sec);
+    updateAddBtns();
   }
 
   function collectRows(sec) {
@@ -208,13 +251,13 @@
       } else if (sec === "int") {
         item = { company: q("in-company"), position: q("in-position"),
                  startMonth: inputToMonth(q("in-start")), endMonth: inputToMonth(q("in-end")),
-                 duties: lines(row.querySelector(".in-duties").value).map(function (t) { return { text: t }; }) };
+                 duties: paragraphs(row.querySelector(".in-duties").value).map(function (t) { return { text: t }; }) };
         if (!item.company) return;
       } else if (sec === "proj") {
         item = { name: q("in-name"), role: q("in-role"),
                  startMonth: inputToMonth(q("in-start")), endMonth: inputToMonth(q("in-end")),
                  techStack: list(row.querySelector(".in-stack").value),
-                 items: lines(row.querySelector(".in-items").value).map(function (t) { return { text: t }; }) };
+                 items: paragraphs(row.querySelector(".in-items").value).map(function (t) { return { text: t }; }) };
         if (!item.name) return;
       } else if (sec === "skill") {
         item = { category: q("in-category"), name: q("in-name") };
@@ -272,6 +315,7 @@
     ["edu", "int", "proj", "skill", "honor", "job"].forEach(function (sec) {
       $id(sec + "-rows").innerHTML = "";
     });
+    updateAddBtns();
   }
 
   /* ---------------- 保存 ---------------- */
@@ -318,46 +362,272 @@
     });
   }
 
-  /* ---------------- 设置控制台（API Key / 插件默认值） ---------------- */
+  /* ---------------- 设置控制台（多 Provider / 搜索 / 插件默认值） ---------------- */
+  var editingProviderId = null;
+
+  function settingsText() {
+    var st = $id("settings-status");
+    if (state.activeProvider) {
+      st.textContent = "已激活：" + state.activeProvider.name;
+      st.className = "key-status ok";
+    } else if (state.hasAnyProvider) {
+      st.textContent = "未启用任何配置";
+      st.className = "key-status warn";
+    } else {
+      st.textContent = "未配置模型 Key";
+      st.className = "key-status warn";
+    }
+  }
+
+  function renderProviders(providers, activeId) {
+    var box = $id("prov-list");
+    box.innerHTML = "";
+    state.providers = providers || [];
+    state.activeProviderId = activeId || "";
+    if (!state.providers.length) {
+      box.innerHTML = '<div class="muted small">暂无配置：在下方「新增配置」或上方卡片中填写后保存。</div>';
+      settingsText();
+      return;
+    }
+    state.providers.forEach(function (p) {
+      var item = document.createElement("div");
+      item.className = "prov-item" + (p.id === activeId ? " active" : "");
+      var head = document.createElement("div");
+      head.className = "prov-main";
+      var tag = p.enabled
+        ? (p.id === activeId ? '<span class="tag required">已激活</span>' : '<span class="tag ok-tag">启用</span>')
+        : '<span class="tag optional">停用</span>';
+      head.innerHTML = "<b>" + esc(p.name || "未命名") + "</b>" +
+        " · 模型 <code>" + esc(p.model || "-") + "</code> " + tag;
+      var sub = document.createElement("div");
+      sub.className = "prov-sub";
+      sub.textContent = "Key: " + (p.apiKeyMasked || "未设置") + " · " + (p.baseUrl || "");
+      var ops = document.createElement("div");
+      ops.className = "prov-ops";
+      if (p.id !== activeId) {
+        var act = document.createElement("button");
+        act.className = "btn tiny";
+        act.textContent = "激活";
+        act.addEventListener("click", function () { activateProvider(p.id); });
+        ops.appendChild(act);
+      }
+      var edit = document.createElement("button");
+      edit.className = "btn tiny";
+      edit.textContent = "编辑";
+      edit.addEventListener("click", function () { editProvider(p); });
+      ops.appendChild(edit);
+      var del = document.createElement("button");
+      del.className = "btn tiny danger-t";
+      del.textContent = "删除";
+      del.addEventListener("click", function () { delProvider(p.id); });
+      ops.appendChild(del);
+      item.appendChild(head);
+      item.appendChild(sub);
+      item.appendChild(ops);
+      box.appendChild(item);
+    });
+    // 激活项排最前（优先级）
+    var act = state.providers.filter(function (p) { return p.id === activeId; })[0];
+    if (act) {
+      state.activeProvider = act;
+      // 快速配置组展示激活项
+      $id("s-name").value = act.name || "";
+      $id("s-model").value = act.model || "";
+      $id("s-baseurl").value = act.baseUrl || "";
+    } else {
+      state.activeProvider = null;
+    }
+    state.hasAnyProvider = state.providers.length > 0;
+    settingsText();
+  }
+
   function loadSettings() {
     return fetch("/api/settings").then(function (r) { return r.json(); }).then(function (j) {
       if (j.code !== 0) throw new Error(errMsg(j));
       var d = j.data;
-      $id("settings-status").textContent = d.hasKey ? ("Key 已配置：" + d.apiKeyMasked) : "未配置模型 Key";
+      renderProviders(d.providers || [], d.activeProviderId);
       $id("s-deep").checked = d.deepSearchDefault !== false;
       $id("s-watermark-formal").checked = d.watermarkDefault !== "practice";
       // 同步生成条默认值
       $id("g-deep").checked = d.deepSearchDefault !== false;
       $id("g-watermark").value = d.watermarkDefault === "practice" ? "practice" : "formal";
+      if (d.searchHasKey) {
+        $id("search-msg").textContent = "搜索 Key 已配置：" + d.searchApiKeyMasked;
+      }
     }).catch(function () {});
   }
 
+  function testProvider(baseUrl, model, apiKey) {
+    return fetch("/api/settings/providers/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ baseUrl: baseUrl, model: model, apiKey: apiKey }),
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j.code !== 0) throw new Error(errMsg(j));
+      return j.data.ok ? "自检通过" : "自检失败：" + (j.data.error || "未知错误");
+    });
+  }
+
+  // 保存并自检（快速配置组 = 新增或编辑当前 provider）
   function saveSettings() {
+    var hint = $id("settings-hint");
     var body = {
-      deepSearchDefault: $id("s-deep").checked,
-      watermarkDefault: $id("s-watermark-formal").checked ? "formal" : "practice",
+      name: $id("s-name").value.trim(),
+      baseUrl: $id("s-baseurl").value.trim(),
+      model: $id("s-model").value.trim(),
     };
+    if (editingProviderId) body.id = editingProviderId;
     var key = $id("s-apikey").value.trim();
     if (key) body.apiKey = key;
-    fetch("/api/settings", {
+    if (!body.name || !body.baseUrl || !body.model) {
+      hint.textContent = "请填写配置名称 / Base URL / 模型名";
+      return;
+    }
+    $id("btn-save-settings").disabled = true;
+    hint.textContent = "保存中…";
+    fetch("/api/settings/providers", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }).then(function (r) { return r.json(); }).then(function (j) {
       if (j.code !== 0) throw new Error(errMsg(j));
+      var saved = (j.data.providers || []).filter(function (p) { return p.id === j.data.activeProviderId; })[0] ||
+                  (j.data.providers || [])[0];
+      renderProviders(j.data.providers, j.data.activeProviderId);
       $id("s-apikey").value = "";
-      $id("settings-status").textContent = j.data.hasKey ? ("Key 已配置：" + j.data.apiKeyMasked) : "未配置模型 Key";
-      $id("settings-hint").textContent = "已保存 " + new Date().toLocaleTimeString();
+      editingProviderId = null;
+      $id("btn-save-settings").textContent = "保存并自检";
+      if (key && saved) {
+        return testProvider(saved.baseUrl, saved.model, key).then(function (msg) {
+          hint.textContent = "已保存，" + msg;
+        });
+      }
+      hint.textContent = "已保存 " + new Date().toLocaleTimeString();
+      return Promise.resolve();
+    }).catch(function (e) {
+      hint.textContent = "保存失败：" + e.message;
+    }).then(function () {
+      $id("btn-save-settings").disabled = false;
+    });
+  }
+
+  // 高级设置：新增配置
+  function addProvider() {
+    var msg = $id("prov-msg");
+    var body = {
+      name: $id("p-name").value.trim(),
+      baseUrl: $id("p-baseurl").value.trim(),
+      model: $id("p-model").value.trim(),
+      capabilities: $id("p-cap").value.trim() || "text",
+    };
+    var key = $id("p-apikey").value.trim();
+    if (!body.name || !body.baseUrl || !body.model) {
+      msg.textContent = "请填写配置名称 / Base URL / 模型名";
+      return;
+    }
+    if (key) body.apiKey = key;
+    $id("btn-add-provider").disabled = true;
+    msg.textContent = "保存中…";
+    fetch("/api/settings/providers", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j.code !== 0) throw new Error(errMsg(j));
+      renderProviders(j.data.providers, j.data.activeProviderId);
+      var saved = (j.data.providers || []).filter(function (p) { return p.id === j.data.activeProviderId; })[0];
+      ["p-name", "p-baseurl", "p-model", "p-apikey"].forEach(function (id) { $id(id).value = ""; });
+      if (key && saved) {
+        return testProvider(saved.baseUrl, saved.model, key).then(function (m) { msg.textContent = m; });
+      }
+      msg.textContent = "已添加配置";
+      return Promise.resolve();
+    }).catch(function (e) {
+      msg.textContent = "添加失败：" + e.message;
+    }).then(function () {
+      $id("btn-add-provider").disabled = false;
+    });
+  }
+
+  // 高级设置：用当前卡片字段自检（不落盘）
+  function testQuickProvider() {
+    var msg = $id("prov-msg");
+    var baseUrl = $id("s-baseurl").value.trim() || $id("p-baseurl").value.trim();
+    var model = $id("s-model").value.trim() || $id("p-model").value.trim();
+    var key = $id("s-apikey").value.trim() || $id("p-apikey").value.trim();
+    if (!baseUrl || !model || !key) { msg.textContent = "请填写 Base URL / 模型 / API Key"; return; }
+    msg.textContent = "自检中…";
+    testProvider(baseUrl, model, key).then(function (m) { msg.textContent = m; });
+  }
+
+  function editProvider(p) {
+    editingProviderId = p.id;
+    $id("s-name").value = p.name || "";
+    $id("s-model").value = p.model || "";
+    $id("s-baseurl").value = p.baseUrl || "";
+    $id("s-apikey").value = "";
+    $id("btn-save-settings").textContent = "保存修改";
+    $id("settings-hint").textContent = "正在编辑：" + p.name + "（Key 留空 = 保留原 Key）";
+    $id("adv-settings").removeAttribute("open");
+    $id("btn-save-settings").scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function activateProvider(id) {
+    fetch("/api/settings/providers/" + id + "/activate", { method: "POST" })
+      .then(function (r) { return r.json(); }).then(function (j) {
+        if (j.code !== 0) throw new Error(errMsg(j));
+        renderProviders(j.data.providers, j.data.activeProviderId);
+      }).catch(function (e) { Adapt.showBanner("激活失败：" + e.message, true); });
+  }
+
+  function delProvider(id) {
+    fetch("/api/settings/providers/" + id, { method: "DELETE" })
+      .then(function (r) { return r.json(); }).then(function (j) {
+        if (j.code !== 0) throw new Error(errMsg(j));
+        if (editingProviderId === id) {
+          editingProviderId = null;
+          $id("btn-save-settings").textContent = "保存并自检";
+        }
+        renderProviders(j.data.providers, j.data.activeProviderId);
+      }).catch(function (e) { Adapt.showBanner("删除失败：" + e.message, true); });
+  }
+
+  function saveSearch() {
+    var key = $id("s-searchkey").value.trim();
+    fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ searchApiKey: key }),
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j.code !== 0) throw new Error(errMsg(j));
+      $id("s-searchkey").value = "";
+      $id("search-msg").textContent = key ? "已保存搜索 Key" : "已关闭联网搜索";
+    }).catch(function (e) {
+      $id("search-msg").textContent = "保存失败：" + e.message;
+    });
+  }
+
+  function saveDefaults() {
+    fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        deepSearchDefault: $id("s-deep").checked,
+        watermarkDefault: $id("s-watermark-formal").checked ? "formal" : "practice",
+      }),
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j.code !== 0) throw new Error(errMsg(j));
       $id("g-deep").checked = $id("s-deep").checked;
       $id("g-watermark").value = $id("s-watermark-formal").checked ? "formal" : "practice";
+      $id("defaults-msg").textContent = "已保存默认值 " + new Date().toLocaleTimeString();
     }).catch(function (e) {
-      $id("settings-hint").textContent = "保存失败：" + e.message;
+      $id("defaults-msg").textContent = "保存失败：" + e.message;
     });
   }
 
   /* ---------------- 生成 + SSE ---------------- */
   function startGenerate() {
-    if (!state.resumeId) { alert("请先保存简历"); return; }
+    if (!state.resumeId) { Adapt.showBanner("请先保存简历", true); return; }
     var body = {
       resumeId: state.resumeId,
       pageOption: $id("g-page").value,
@@ -419,7 +689,7 @@
         $id("btn-cancel").disabled = true;
         $id("progress-fill").style.width = "100%";
         $id("progress-text").textContent = "生成完成，可预览 / 适配 / 编辑";
-        Adapt.showBanner("生成完成。请预览确认内容与排版；如需调整可在右侧点击正文编辑，或使用「自动适配」。");
+        Adapt.showBanner("生成完成。请预览确认内容与排版；如需调整可点击正文编辑，或使用「自动适配」。");
         loadList();
       });
     });
@@ -465,11 +735,16 @@
     $id("btn-new").addEventListener("click", newResume);
     $id("btn-save").addEventListener("click", saveResume);
     $id("btn-save-settings").addEventListener("click", saveSettings);
+    $id("btn-add-provider").addEventListener("click", addProvider);
+    $id("btn-test-provider").addEventListener("click", testQuickProvider);
+    $id("btn-save-search").addEventListener("click", saveSearch);
+    $id("btn-save-defaults").addEventListener("click", saveDefaults);
     $id("btn-generate").addEventListener("click", startGenerate);
     $id("btn-cancel").addEventListener("click", cancelTask);
     document.querySelectorAll("[data-add]").forEach(function (btn) {
       btn.addEventListener("click", function () { addRow(btn.getAttribute("data-add")); });
     });
+    updateAddBtns();
   }
 
   if (document.readyState === "loading") {

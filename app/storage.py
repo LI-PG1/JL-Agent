@@ -101,8 +101,11 @@ class Storage:
     # ------------------------------------------------------------ Settings（§5 设置控制台）
     _DEFAULT_SETTINGS = {
         "apiKey": "",
+        "searchApiKey": "",
         "deepSearchDefault": True,
         "watermarkDefault": "formal",
+        "providers": [],
+        "activeProviderId": "",
     }
 
     def load_settings(self) -> dict:

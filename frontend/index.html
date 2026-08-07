@@ -11,7 +11,7 @@
   <header class="topbar">
     <div class="brand">
       <h1>JL-Agent</h1>
-      <span class="sub">简历生成工作台</span>
+      <span class="ver-tag">简历生成工作台</span>
     </div>
     <div class="top-right">
       <span id="health-status">检测中…</span>
@@ -23,75 +23,125 @@
     <section class="card">
       <div class="card-head">
         <h2>设置控制台</h2>
-        <span id="settings-status" class="muted small"></span>
+        <span id="settings-status" class="key-status">检查配置…</span>
       </div>
+
+      <!-- 配置逻辑引导条（三步 + 高级设置可选） -->
+      <div class="flow-steps">
+        <div class="flow-step"><b><span class="fs-no">1</span>粘贴钥匙</b>填配置名称 / Base URL / API Key</div>
+        <div class="flow-step"><b><span class="fs-no">2</span>选择能力</b>文本 / 视觉（可留空）</div>
+        <div class="flow-step"><b><span class="fs-no">3</span>保存验证</b>自检通过即生效</div>
+        <div class="flow-step optional"><b><span class="fs-no alt">4</span>高级设置（可选）</b>多模型管理 / 搜索 Key</div>
+      </div>
+
+      <!-- 快速配置组（当前 provider） -->
       <div class="grid">
-        <label class="wide">模型 API Key（DeepSeek）
-          <input id="s-apikey" type="password" maxlength="512" autocomplete="off"
-                 placeholder="sk-...（留空则保留已配置 Key）">
-        </label>
-        <label class="chk"><input id="s-deep" type="checkbox"> 默认开启深度搜索</label>
-        <label class="chk"><input id="s-watermark-formal" type="checkbox" checked> 默认无水印（正式版）</label>
+        <label>配置名称<input id="s-name" maxlength="64" placeholder="如 DeepSeek / siliconflow"></label>
+        <label>模型名<input id="s-model" maxlength="128" placeholder="deepseek-chat"></label>
+        <label class="wide">Base URL<input id="s-baseurl" maxlength="256" placeholder="https://api.deepseek.com"></label>
+        <label class="wide">模型 API Key<input id="s-apikey" type="password" maxlength="512" autocomplete="off"
+               placeholder="sk-...（更新时留空 = 保留原 Key）"></label>
       </div>
       <div class="actions">
-        <button id="btn-save-settings" class="btn primary" type="button">保存设置</button>
+        <button id="btn-save-settings" class="btn primary" type="button">保存并自检</button>
         <span id="settings-hint" class="muted small"></span>
       </div>
+
+      <!-- 高级设置（MS-Agent 风格抽屉式展开） -->
+      <details class="adv" id="adv-settings">
+        <summary>⚙ 高级设置（多模型配置管理 / 搜索 / 插件默认值）</summary>
+        <div id="prov-list" class="prov-list"></div>
+        <h4>新增配置</h4>
+        <div class="hint-line">主卡片每次保存一条配置；保存后 API Key 输入框自动清空，可继续粘贴下一个平台的 Key。列表顺序即调用优先级，激活项排最前。</div>
+        <div class="grid">
+          <label>配置名称<input id="p-name" maxlength="64" placeholder="如 my-key-2"></label>
+          <label>模型名<input id="p-model" maxlength="128" placeholder="如 Qwen/Qwen2.5-72B-Instruct"></label>
+          <label class="wide">Base URL<input id="p-baseurl" maxlength="256" placeholder="https://api.xxx.com/v1"></label>
+          <label class="wide">API Key<input id="p-apikey" type="password" maxlength="512" placeholder="sk-..."></label>
+          <label>能力（text / vision，逗号分隔）<input id="p-cap" maxlength="64" value="text"></label>
+        </div>
+        <div class="actions">
+          <button id="btn-add-provider" class="btn" type="button">添加配置</button>
+          <button id="btn-test-provider" class="btn ghost" type="button">配置自检</button>
+          <span id="prov-msg" class="muted small"></span>
+        </div>
+
+        <h4>联网搜索（可选增强）</h4>
+        <div class="hint-line">配置搜索服务 Key 后，生成前会自动搜索权威来源并注入上下文，减少「待联网核实」标注。全部可选：不配置时按协议标注，不影响生成。</div>
+        <div class="grid">
+          <label class="wide">Tavily API Key<input id="s-searchkey" type="password" maxlength="512"
+                 placeholder="tvly-...（留空保存 = 关闭联网搜索）"></label>
+        </div>
+        <div class="actions">
+          <button id="btn-save-search" class="btn" type="button">保存搜索 Key</button>
+          <span id="search-msg" class="muted small"></span>
+        </div>
+
+        <h4>插件默认值</h4>
+        <div class="grid">
+          <label class="chk"><input id="s-deep" type="checkbox"> 默认开启深度搜索</label>
+          <label class="chk"><input id="s-watermark-formal" type="checkbox" checked> 默认无水印（正式版）</label>
+        </div>
+        <div class="actions">
+          <button id="btn-save-defaults" class="btn" type="button">保存默认值</button>
+          <span id="defaults-msg" class="muted small"></span>
+        </div>
+      </details>
     </section>
 
     <!-- ================= ② 简历信息 ================= -->
     <section class="card">
       <div class="card-head">
-        <h2>简历信息 <span class="muted small">（必填项未标注）</span></h2>
+        <h2>简历信息</h2>
         <span id="cur-resume" class="muted small"></span>
       </div>
       <div class="form">
         <fieldset>
-          <legend>基本信息（必填）</legend>
+          <legend>基本信息 <span class="tag required">必选</span></legend>
           <div class="grid">
             <label>姓名<input id="f-name" maxlength="32" placeholder="张三"></label>
             <label>年龄<input id="f-age" type="number" min="16" max="70" placeholder="24"></label>
             <label>邮箱<input id="f-email" placeholder="name@mail.com"></label>
             <label>电话<input id="f-phone" maxlength="20" placeholder="13800000000"></label>
-            <label>个人网页（可选）<input id="f-website" placeholder="https://"></label>
-            <label>常驻城市（可选）<input id="f-base" maxlength="50"></label>
-            <label>可实习时长（可选）<input id="f-duration" maxlength="50"></label>
-            <label>到岗时间（可选）<input id="f-start" maxlength="50"></label>
+            <label>个人网页<span class="opt">（可选）</span><input id="f-website" placeholder="https://"></label>
+            <label>常驻城市<span class="opt">（可选）</span><input id="f-base" maxlength="50"></label>
+            <label>可实习时长<span class="opt">（可选）</span><input id="f-duration" maxlength="50"></label>
+            <label>到岗时间<span class="opt">（可选）</span><input id="f-start" maxlength="50"></label>
           </div>
         </fieldset>
 
         <fieldset>
-          <legend>教育经历（必填 1~3 条）</legend>
+          <legend>教育经历 <span class="tag required">必选</span></legend>
           <div id="edu-rows"></div>
           <button class="btn small" type="button" data-add="edu">+ 添加教育</button>
         </fieldset>
 
         <fieldset>
-          <legend>实习经历（可选 0~2 条）</legend>
+          <legend>实习经历 <span class="tag optional">可选</span></legend>
           <div id="int-rows"></div>
           <button class="btn small" type="button" data-add="int">+ 添加实习</button>
         </fieldset>
 
         <fieldset>
-          <legend>项目经验（可选，AI 可按需创作）</legend>
+          <legend>项目经验 <span class="tag optional">可选</span><span class="opt-hint">AI 可按需创作</span></legend>
           <div id="proj-rows"></div>
           <button class="btn small" type="button" data-add="proj">+ 添加项目</button>
         </fieldset>
 
         <fieldset>
-          <legend>技能特长（必填 ≥1 条）</legend>
+          <legend>技能特长 <span class="tag required">必选</span></legend>
           <div id="skill-rows"></div>
           <button class="btn small" type="button" data-add="skill">+ 添加技能</button>
         </fieldset>
 
         <fieldset>
-          <legend>证书荣誉（可选）</legend>
+          <legend>证书荣誉 <span class="tag optional">可选</span></legend>
           <div id="honor-rows"></div>
           <button class="btn small" type="button" data-add="honor">+ 添加荣誉</button>
         </fieldset>
 
         <fieldset>
-          <legend>目标岗位 JD（必填 1~5 套）</legend>
+          <legend>目标岗位 JD <span class="tag required">必选</span></legend>
           <div id="job-rows"></div>
           <button class="btn small" type="button" data-add="job">+ 添加 JD</button>
         </fieldset>

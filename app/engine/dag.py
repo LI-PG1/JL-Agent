@@ -31,7 +31,7 @@ TERMINAL_EVENTS = {"task.done", "task.failed", "task.canceled"}
 
 def build_runner(app) -> "GenerationRunner":
     """从 FastAPI app.state 组装 Runner（路由层调用）。"""
-    provider = LLMProvider(app.state.config)
+    provider = LLMProvider(app.state.config, app.state.storage)
     return GenerationRunner(
         storage=app.state.storage,
         rules=app.state.rules,

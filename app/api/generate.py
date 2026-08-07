@@ -60,7 +60,7 @@ async def generate(body: GenerateBody, request: Request):
     if not jobs:
         raise AppError(E_PARAM, "请至少填写 1 套目标岗位 JD")
 
-    provider = LLMProvider(cfg)
+    provider = LLMProvider(cfg, app.state.storage)
     analyzer = JDAnalyzer(provider, app.state.rules)
 
     # 1) JD 分析 → 共享事实表（领域标签写回各 Job）

@@ -253,6 +253,31 @@ check("设置保存 + Key 脱敏", r.status_code == 200 and d["hasKey"] is True
 r = httpx.put(f"{BASE}/api/settings", json={"apiKey": ""}, timeout=10)
 check("清空 Key", r.json()["data"]["hasKey"] is False)
 
+# 多 Provider：新增 → 激活 → 回读脱敏 → 自检结构 → 删除
+r = httpx.put(f"{BASE}/api/settings/providers", json={
+    "name": "GLM", "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
+    "model": "glm-4-flash", "apiKey": "sk-glm-abcdef", "capabilities": "text", "enabled": True}, timeout=10)
+d = r.json()["data"]
+pid = next((p for p in d["providers"] if p.get("name") == "GLM"), {}).get("id")
+check("新增 provider 并自动激活", r.status_code == 200 and pid and d["activeProviderId"] == pid, str(d))
+r = httpx.post(f"{BASE}/api/settings/providers/{pid}/activate", timeout=10)
+check("显式激活 provider", r.status_code == 200 and r.json()["data"]["activeProviderId"] == pid, str(r.json()))
+r = httpx.get(f"{BASE}/api/settings", timeout=10)
+d = r.json()["data"]
+check("设置回读含 providers/activeProviderId",
+      isinstance(d.get("providers"), list) and d["activeProviderId"] == pid, str(d))
+row = next((p for p in d["providers"] if p.get("id") == pid), {})
+check("provider Key 脱敏", row.get("apiKey") is None
+      and "sk-g" in row.get("apiKeyMasked", ""), str(d["providers"]))
+r = httpx.post(f"{BASE}/api/settings/providers/test", json={
+    "baseUrl": "https://invalid.example.invalid/v1", "model": "x", "apiKey": "sk-bad"}, timeout=10)
+d = r.json()["data"]
+check("配置自检返回结构", r.status_code == 200 and d["ok"] is False and "error" in d, str(d))
+r = httpx.delete(f"{BASE}/api/settings/providers/{pid}", timeout=10)
+d = r.json()["data"]
+check("删除 provider 生效", r.status_code == 200
+      and all(p.get("id") != pid for p in d["providers"]), str(d["providers"]))
+
 r = httpx.get(f"{BASE}/api/resume/{rid3}/export?format=json", timeout=10)
 check("导出 JSON", r.status_code == 200 and "application/json" in r.headers.get("content-type", ""), str(r.status_code))
 r = httpx.get(f"{BASE}/api/resume/{rid3}/export?format=docx", timeout=10)

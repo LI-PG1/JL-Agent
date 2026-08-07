@@ -26,7 +26,7 @@ class ExtendBody(BaseModel):
 @router.post("/validate", response_model=dict)
 async def validate(body: ValidateBody, request: Request):
     """技能相关性三档判定（§3.1.4）：pass/weak/block；block 时返回 40002（前端可拦截）。"""
-    provider = LLMProvider(request.app.state.config)
+    provider = LLMProvider(request.app.state.config, request.app.state.storage)
     rules = request.app.state.rules.skills_rules()
     result = await validate_skills(
         provider,
@@ -42,7 +42,7 @@ async def validate(body: ValidateBody, request: Request):
 @router.post("/extend", response_model=dict)
 async def extend(body: ExtendBody, request: Request):
     """技能拓展：返回原技能 + 推荐技能合并列表。"""
-    provider = LLMProvider(request.app.state.config)
+    provider = LLMProvider(request.app.state.config, request.app.state.storage)
     recommended = await extend_skills(
         provider,
         [s.model_dump() for s in body.skills],

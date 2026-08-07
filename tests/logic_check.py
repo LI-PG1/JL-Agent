@@ -648,6 +648,31 @@ async def t6():
             ok("清空 Key 生效", r.json()["data"]["hasKey"] is False)
             ok("清空后环境变量移除", os.getenv(env_actual) is None)
 
+            # 多 Provider：新增 → 激活 → 回读脱敏 → 自检结构 → 删除
+            r = client.put("/api/settings/providers", json={
+                "name": "GLM", "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
+                "model": "glm-4-flash", "apiKey": "sk-glm-abcdef", "capabilities": "text", "enabled": True})
+            d = r.json()["data"]
+            pid = next((p for p in d["providers"] if p.get("name") == "GLM"), {}).get("id")
+            ok("新增 provider 并自动激活", r.status_code == 200 and pid and d["activeProviderId"] == pid, str(d))
+            r = client.post(f"/api/settings/providers/{pid}/activate")
+            ok("显式激活 provider", r.status_code == 200 and r.json()["data"]["activeProviderId"] == pid, str(r.json()))
+            r = client.get("/api/settings")
+            d = r.json()["data"]
+            ok("设置回读含 providers/activeProviderId",
+               isinstance(d.get("providers"), list) and d["activeProviderId"] == pid, str(d))
+            row = next((p for p in d["providers"] if p.get("id") == pid), {})
+            ok("provider Key 脱敏", row.get("apiKey") is None
+               and "sk-g" in row.get("apiKeyMasked", ""), str(d["providers"]))
+            r = client.post("/api/settings/providers/test", json={
+                "baseUrl": "https://invalid.example.invalid/v1", "model": "x", "apiKey": "sk-bad"})
+            d = r.json()["data"]
+            ok("配置自检返回结构", r.status_code == 200 and d["ok"] is False and "error" in d, str(d))
+            r = client.delete(f"/api/settings/providers/{pid}")
+            d = r.json()["data"]
+            ok("删除 provider 生效", r.status_code == 200
+               and all(p.get("id") != pid for p in d["providers"]), str(d["providers"]))
+
             # 技能分类扩容：新枚举值可通过 Resume 校验并保存
             r = client.post("/api/resume", json={
                 "basicInfo": {"name": "李四", "age": 25, "email": "l@b.com", "phone": "13900000000"},

@@ -274,7 +274,7 @@
   function saveEdit() {
     if (!editing) return;
     var text = $id("edit-text").value.trim();
-    if (!text) { alert("文本不能为空"); return; }
+    if (!text) { showBanner("文本不能为空", true); return; }
     var body = { block: editing.block, index: editing.index, text: text };
     if (editing.subIndex != null) body.subIndex = editing.subIndex;
     put("/api/resume/" + state.resumeId + "/item", body).then(function (data) {

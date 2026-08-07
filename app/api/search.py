@@ -14,7 +14,7 @@ def search_mode(request: Request):
     missing = []
     if not client.ready:
         missing.append(cfg.search.api_key_env)
-    if not LLMProvider(cfg).ready:
+    if not LLMProvider(cfg, request.app.state.storage).ready:
         missing.append(cfg.provider.api_key_env)
     return {
         "code": 0,
