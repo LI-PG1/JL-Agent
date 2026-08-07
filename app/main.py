@@ -1,13 +1,17 @@
-"""JL-Agent 后端入口（P1 骨架）：/api/health + 静态前端 + 规则加载。"""
+"""JL-Agent 后端入口：/api/health + 静态前端 + 规则加载 + P2 CRUD。"""
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from .api import resume as resume_api
+from .api import upload as upload_api
 from .config import load_config
 from .core.errors import AppError
 from .core.rules import RulesLoader
+from .storage import Storage
 
 
 @asynccontextmanager
@@ -17,6 +21,8 @@ async def lifespan(app: FastAPI):
     rules.load_all()  # 规则缺失/非法 → 启动即报错（fail fast）
     app.state.config = cfg
     app.state.rules = rules
+    app.state.storage = Storage(cfg.paths.data_dir)
+    app.state.now = lambda: datetime.now().astimezone().isoformat(timespec="seconds")
     yield
 
 
@@ -40,6 +46,10 @@ def health():
         "message": "ok",
         "data": {"status": "up", "rules": rules.versions},
     }
+
+
+app.include_router(resume_api.router)
+app.include_router(upload_api.router)
 
 
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
