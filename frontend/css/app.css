@@ -171,6 +171,33 @@ code {
 .tag.err-tag { background: #fee2e2; color: var(--err); }
 .tag.on-tag { background: var(--accent); color: #fff; }
 
+/* R20-3：配置前醒目提示（如 MediaCrawler 需扫码登录） */
+.login-notice {
+  margin-top: 8px; padding: 7px 10px;
+  background: #fef2f2; border: 1px solid #fecaca; border-left: 3px solid var(--err);
+  color: #b91c1c; font-size: 12px; line-height: 1.6; border-radius: var(--radius-small);
+  word-break: break-all;
+}
+
+/* R20-4：可展开式教程（Tavily API Key） */
+details.tutorial {
+  margin-top: 10px; border: 1px dashed var(--line); border-radius: var(--radius-small);
+  background: var(--accent-soft); padding: 8px 12px;
+}
+details.tutorial summary {
+  cursor: pointer; font-size: 12px; font-weight: 600; color: var(--accent);
+  user-select: none;
+}
+details.tutorial ol {
+  margin: 8px 0 0 18px; font-size: 12px; color: var(--ink-soft); line-height: 1.8;
+}
+details.tutorial a { color: var(--accent); text-decoration: underline; }
+
+/* R20-5：水印选项说明 */
+.wm-hint {
+  font-size: 11px; font-weight: normal; color: var(--ink-mute); line-height: 1.6;
+}
+
 /* 配置状态条 */
 .key-status { font-size: 12px; font-weight: 600; }
 .key-status.ok { color: var(--ok); }

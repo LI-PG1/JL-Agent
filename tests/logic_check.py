@@ -677,9 +677,11 @@ async def t6():
             r = client.get("/api/settings")
             d = r.json()["data"]
             pl = d.get("plugins") or []
-            ok("插件注册表回读（含 zhihu-cli/ats-checker/markdown-cv）",
-               len(pl) == 3 and all(p.get("enabled") is False for p in pl) and
-               {p["id"] for p in pl} == {"zhihu-cli", "ats-checker", "markdown-cv"}, str(pl))
+            ok("插件注册表回读（6 个：OpenCLI/MediaCrawler/Agent-Reach/zhihu-cli/ats-checker/markdown-cv）",
+               len(pl) == 6 and all(p.get("enabled") is False for p in pl) and
+               {p["id"] for p in pl} == {"opencli", "mediacrawler", "agent-reach",
+                                         "zhihu-cli", "ats-checker", "markdown-cv"},
+               str([p["id"] for p in pl]))
             r = client.put("/api/settings/plugins/zhihu-cli", json={"enabled": True})
             d = r.json()["data"]
             on = next((p for p in d["plugins"] if p["id"] == "zhihu-cli"), {})
@@ -700,10 +702,34 @@ async def t6():
                r.status_code == 200 and "configured" in on and "installStatus" in on
                and on["installStatus"] in ("installed", "failed") and "features" in on
                and "featuresList" in on and len(on["featuresList"]) == 3 and "config" in on, str(on))
-            ok("一键配置联动启用（配置成功即自动启用）",
-               (not on["configured"]) or on["enabled"] is True, str(on))
+            # R20-2：配置成功与启用分离 —— configure 只写配置状态，不自动启用、不覆盖用户勾选
+            ok("配置与启用分离（configure 保持用户手动勾选状态）",
+               on["enabled"] is True and on["configured"] in (True, False), str(on))
+            # R20-3：MediaCrawler 配置流程（git clone 目录检测）+ 扫码登录醒目提示
+            mc = next((p for p in d["plugins"] if p["id"] == "mediacrawler"), {})
+            ok("MediaCrawler 扫码登录醒目提示（loginNotice）",
+               bool(mc.get("loginNotice")) and "扫码登录" in mc["loginNotice"], str(mc.get("loginNotice")))
+            r = client.post("/api/settings/plugins/mediacrawler/configure?auto_install=false")
+            d = r.json()["data"]
+            mc = next((p for p in d["plugins"] if p["id"] == "mediacrawler"), {})
+            ok("MediaCrawler git 目录检测（未克隆 → 配置失败）",
+               r.status_code == 200 and mc["installStatus"] == "failed" and mc["configured"] is False, str(mc))
+            ok("MediaCrawler 默认参数与功能模块写入",
+               mc["config"].get("storeType") == "csv" and mc["features"].get("search") is True
+               and len(mc["featuresList"]) == 3, str(mc))
             r = client.post("/api/settings/plugins/not-exist/configure")
             ok("未知插件一键配置拦截", r.status_code == 400 and r.json()["code"] == 40001, str(r.json()))
+
+            # R20-2 单元：模拟已安装 → 配置成功（configured=True）→ 不自动启用，须用户手动勾选
+            from unittest import mock
+            from app.api import settings as settings_mod
+            with mock.patch.object(settings_mod, "_plugin_installed", return_value=True):
+                r = client.post("/api/settings/plugins/opencli/configure?auto_install=false")
+            d = r.json()["data"]
+            on = next((p for p in d["plugins"] if p["id"] == "opencli"), {})
+            ok("配置成功（configured=True）不自动启用（R20-2 分离机制）",
+               on["configured"] is True and on["enabled"] is False
+               and on["installStatus"] == "installed", str(on))
 
             # 第二层：功能模块精细控制（持久化 + 未知模块拦截）
             r = client.put("/api/settings/plugins/zhihu-cli/features/hot", json={"enabled": True})

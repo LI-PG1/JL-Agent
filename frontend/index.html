@@ -127,6 +127,7 @@
             <option value="formal">无（正式无水印）</option>
             <option value="practice">练习（有水印）</option>
           </select>
+          <span class="wm-hint">正式版：无水印、版面干净，适合最终投递；练习版：底部叠加「本简历部分内容由 AI 生成，请确认真实性后再投递」提示，防止未经确认的内容被误投递。</span>
         </label>
         <label class="chk"><input id="g-deep" type="checkbox" checked> 深度搜索</label>
       </div>
@@ -210,6 +211,15 @@
       <button id="btn-save-search" class="btn" type="button">保存搜索 Key</button>
       <span id="search-msg" class="muted small"></span>
     </div>
+    <details class="tutorial">
+      <summary>如何获取 Tavily API Key？（点击展开教程）</summary>
+      <ol>
+        <li>打开官方平台 <a href="https://app.tavily.com" target="_blank" rel="noopener">app.tavily.com ↗</a>，注册或登录账号；</li>
+        <li>进入 Dashboard（控制台），找到左侧「API Keys」页面；</li>
+        <li>点击「Create API Key」生成以 <code>tvly-</code> 开头的密钥；</li>
+        <li>复制密钥粘贴到上方输入框，点击「保存搜索 Key」即启用联网搜索。</li>
+      </ol>
+    </details>
 
     <h4>插件默认值</h4>
     <div class="grid">
@@ -222,7 +232,7 @@
     </div>
 
     <h4>可集成插件（外部 CLI 工具）</h4>
-    <div class="hint-line">外部工具当前为「待接入」状态：启用后记录偏好，接入方案见项目文档。点击 GitHub 链接查看工具说明。</div>
+    <div class="hint-line">外部工具为「待接入」状态：点击「⚙ 一键配置」自动检测依赖并安装（失败会给出排查指引）；配置成功后「启用」才可选，由你自主决定是否激活。支持 OpenCLI / MediaCrawler / Agent-Reach / zhihu-cli 等，点击 GitHub 链接查看工具说明。</div>
     <div id="plugin-list"></div>
     <div class="actions">
       <span id="plugin-msg" class="muted small"></span>

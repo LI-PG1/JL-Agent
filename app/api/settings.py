@@ -16,6 +16,7 @@ import os
 import shutil
 import subprocess
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 import httpx
@@ -30,9 +31,57 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 PROVIDER_FIELDS = ("id", "name", "baseUrl", "model", "apiKey", "capabilities", "enabled", "order")
 
-# 可集成插件注册表（外部 CLI 工具；双层启动：一键配置 + 手动勾选）
-# runtime.manager/bin 用于依赖检测与自动安装；features 为功能模块（精细控制）；defaultConfig 为默认参数。
+# 可集成插件注册表（外部 CLI/项目；双层启动：一键配置 + 手动勾选）
+# runtime.manager/bin 用于依赖检测与自动安装；runtime.dir 表示「克隆项目目录」检测（git clone 类插件）；
+# features 为功能模块（精细控制）；defaultConfig 为默认参数；loginNotice 为配置前醒目提示（如 MediaCrawler 需扫码登录）。
 PLUGIN_REGISTRY = [
+    {
+        "id": "opencli",
+        "name": "OpenCLI",
+        "category": "内容获取",
+        "source": "https://github.com/jackwener/OpenCLI",
+        "description": "100+ 站点一键 CLI：知乎热榜/搜索、B站、小红书、X/Twitter、Reddit、微博等。复用本机 Chrome 登录态，凭证不出浏览器。",
+        "runtime": {"manager": "npm", "bin": "opencli",
+                    "install": ["npm", "install", "-g", "@jackwener/opencli"]},
+        "features": [
+            {"id": "search", "name": "内容搜索", "default": True},
+            {"id": "hot", "name": "热榜获取", "default": False},
+        ],
+        "defaultConfig": {"format": "json", "limit": 5},
+    },
+    {
+        "id": "mediacrawler",
+        "name": "MediaCrawler",
+        "category": "内容获取",
+        "source": "https://github.com/NanmiCoder/MediaCrawler",
+        "description": "小红书/抖音/快手/B站/微博/贴吧/知乎 7 平台采集：关键词搜索、帖子与评论、创作者主页。",
+        "runtime": {"manager": "git", "dir": "plugins/MediaCrawler", "bin": "MediaCrawler",
+                    "checkFile": "main.py",
+                    "install": ["git", "clone", "--depth", "1",
+                                "https://github.com/NanmiCoder/MediaCrawler.git", "plugins/MediaCrawler"]},
+        "features": [
+            {"id": "search", "name": "关键词搜索", "default": True},
+            {"id": "comment", "name": "评论采集", "default": False},
+            {"id": "homepage", "name": "创作者主页", "default": False},
+        ],
+        "defaultConfig": {"maxConcurrency": 1, "storeType": "csv"},
+        "loginNotice": "需扫码登录：首次使用需用 Chrome 打开目标平台并扫码登录账号，采集时复用该登录态，请确保操作前已完成登录。",
+    },
+    {
+        "id": "agent-reach",
+        "name": "Agent-Reach",
+        "category": "内容获取",
+        "source": "https://github.com/Panniantong/Agent-Reach",
+        "description": "16 平台能力层：网页/YouTube/RSS/GitHub/X/Reddit/小红书/抖音/微博等，零 API 费用，多后端自动切换。",
+        "runtime": {"manager": "pip", "bin": "agent-reach",
+                    "install": ["pip", "install", "-U", "agent-reach"]},
+        "features": [
+            {"id": "web", "name": "网页读取", "default": True},
+            {"id": "social", "name": "社媒搜索", "default": False},
+            {"id": "youtube", "name": "YouTube 字幕", "default": False},
+        ],
+        "defaultConfig": {"format": "json"},
+    },
     {
         "id": "zhihu-cli",
         "name": "zhihu-cli",
@@ -68,9 +117,10 @@ PLUGIN_REGISTRY = [
         "category": "模板输出",
         "source": "https://github.com/elipapa/markdown-cv",
         "description": "将简历输出为 Markdown 格式，便于网页/文档场景复用。",
-        "runtime": {"manager": "git", "bin": "markdown-cv",
+        "runtime": {"manager": "git", "dir": "plugins/markdown-cv", "bin": "markdown-cv",
+                    "checkFile": "index.md",
                     "install": ["git", "clone", "--depth", "1",
-                                "https://github.com/elipapa/markdown-cv.git", "markdown-cv"]},
+                                "https://github.com/elipapa/markdown-cv.git", "plugins/markdown-cv"]},
         "features": [
             {"id": "render", "name": "Markdown 渲染", "default": True},
             {"id": "pdf", "name": "PDF 导出", "default": False},
@@ -107,21 +157,55 @@ def _plugins_view(s: dict) -> list[dict]:
     return out
 
 
-def _run_install(runtime: dict) -> tuple[str, str]:
-    """执行自动安装（列表参数、无 shell、超时 180s）；返回 (installStatus, msg)。"""
+def _plugin_installed(runtime: dict, data_dir: Path) -> bool:
+    """检测插件运行环境是否就绪：优先校验克隆目录（git clone 类插件，需目录存在且含标识文件，
+    避免克隆中断留下的空目录被误判为已安装），否则查 PATH 可执行文件。"""
+    d = runtime.get("dir")
+    if d:
+        check = runtime.get("checkFile") or ".git"
+        return (data_dir / d).is_dir() and (data_dir / d / check).exists()
+    return shutil.which(runtime.get("bin", "")) is not None
+
+
+def _run_install(runtime: dict, data_dir: Path) -> tuple[str, str]:
+    """执行自动安装（列表参数、无 shell、超时 180s，克隆类在 data 目录下落地）；
+    返回 (installStatus, msg)。失败消息附带可操作的排查步骤（§R20-1）。
+
+    Windows 下 git 会派生持有管道子进程，直接 subprocess.run(timeout=) 超时后
+    communicate() 仍可能挂起；故用 Popen + 超时后 taskkill /T /F 递归终止进程树再收尾。
+    """
     cmd = list(runtime.get("install") or [])
     if not cmd:
         return "failed", "未配置自动安装命令"
+    creationflags = 0
+    if os.name == "nt":
+        creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
-        tail = (proc.stderr or proc.stdout or "").strip()[-300:]
-        if proc.returncode == 0 and shutil.which(runtime.get("bin", "")):
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                text=True, cwd=str(data_dir), creationflags=creationflags)
+        try:
+            out, _ = proc.communicate(timeout=180)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            if os.name == "nt":
+                subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)],
+                               capture_output=True)
+            out, _ = proc.communicate()
+            return "failed", (
+                f"安装超时（180s）。排查：① 网络较慢或依赖较大，可手动执行「{' '.join(cmd)}」；"
+                f"② 安装完成后重新点击一键配置。")
+        tail = (out or "").strip()[-400:]
+        if proc.returncode == 0 and _plugin_installed(runtime, data_dir):
             return "installed", "自动安装完成：" + " ".join(cmd)
-        return "failed", f"自动安装失败(exit={proc.returncode})：{tail or '详见终端'}"
+        return "failed", (
+            f"自动安装失败(exit={proc.returncode})：{tail or '详见终端'}。"
+            f"排查：① 手动执行「{' '.join(cmd)}」查看完整报错；"
+            f"② 确认网络可访问对应源（npm registry / GitHub / PyPI）；"
+            f"③ 权限不足时请以管理员终端重试。")
     except FileNotFoundError:
-        return "failed", "无法执行安装命令，请手动安装：" + " ".join(cmd)
-    except subprocess.TimeoutExpired:
-        return "failed", "安装超时（180s），请手动安装：" + " ".join(cmd)
+        return "failed", (
+            f"无法执行安装命令 {runtime.get('manager', '')}：请先安装 {runtime.get('manager', '')} 并确保已加入 PATH。"
+            f"排查：命令行执行 {runtime.get('manager', '')} -v 验证。")
 
 
 def _providers_view(s: dict) -> list[dict]:
@@ -381,40 +465,41 @@ def configure_plugin(plugin_id: str, request: Request, auto_install: bool = True
     """第一层：一键配置——依赖环境检测 → 自动安装 → 默认参数写入 → 基础功能预激活。
 
     幂等可重复执行；auto_install=False 仅检测不安装（供测试/预检）；安装失败时
-    configured=False 并返回手动安装指引，不影响手动勾选。
+    configured=False 并返回带排查步骤的手动指引。
+    配置成功 ≠ 自动启用（§R20-2）：是否启用由用户在「启用」勾选处自主决定。
     """
     storage = request.app.state.storage
     p = _plugin_or_404(plugin_id)
     s = storage.load_settings()
     state = s.setdefault("pluginState", {}).setdefault(plugin_id, {})
     runtime = p.get("runtime") or {}
-    bin_name = runtime.get("bin", plugin_id)
+    data_dir = storage.root
+    name = p.get("name", plugin_id)
 
-    # 1) 依赖环境检测
-    installed = shutil.which(bin_name) is not None
+    # 1) 依赖环境检测（克隆目录 / PATH 可执行文件）
+    installed = _plugin_installed(runtime, data_dir)
     status, msg = ("installed", "运行环境已就绪") if installed else (None, "")
 
     # 2) 自动安装（缺依赖、开启 auto_install 且存在包管理器时）
     if not installed and auto_install:
         manager = shutil.which(runtime.get("manager", ""))
         if not manager:
-            status, msg = "failed", f"缺少包管理器 {runtime.get('manager', '')}，请先安装后重试"
+            status, msg = "failed", (
+                f"缺少包管理器 {runtime.get('manager', '')}，请先安装后重试。"
+                f"排查：命令行执行 {runtime.get('manager', '')} -v 验证。")
         else:
-            status, msg = _run_install(runtime)
+            status, msg = _run_install(runtime, data_dir)
             installed = status == "installed"
     elif not installed and not auto_install:
-        status, msg = "failed", f"未检测到可执行程序 {bin_name}（自动安装已跳过）"
+        status, msg = "failed", f"未检测到 {name} 运行环境（自动安装已跳过）。点击「一键配置」执行自动安装。"
 
-    # 3) 默认参数写入 + 基础功能预激活
+    # 3) 默认参数写入 + 基础功能预激活（features 按注册表 default 预勾选）
     state["config"] = dict(p.get("defaultConfig") or {})
     state["features"] = {f["id"]: bool(f.get("default", False)) for f in p.get("features") or []}
     state["installStatus"] = status
     state["installMsg"] = msg
+    state["configured"] = bool(installed)
     if installed:
-        state["configured"] = True
         state["installTime"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-        s.setdefault("pluginsEnabled", {})[plugin_id] = True   # 联动：预激活 → 启用
-    else:
-        state["configured"] = False
     storage.save_settings(s)
     return {"code": 0, "message": "ok", "data": {"plugins": _plugins_view(s)}}

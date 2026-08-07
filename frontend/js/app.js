@@ -707,6 +707,14 @@
       toggle.appendChild(document.createTextNode("启用"));
       ops.appendChild(toggle);
       item.appendChild(main);
+
+      // R20-3：配置前醒目提示（如 MediaCrawler 需扫码登录）
+      if (p.loginNotice) {
+        var notice = document.createElement("div");
+        notice.className = "login-notice";
+        notice.textContent = "⚠ " + p.loginNotice;
+        item.appendChild(notice);
+      }
       item.appendChild(sub);
       item.appendChild(ops);
 
