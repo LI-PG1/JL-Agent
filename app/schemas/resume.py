@@ -61,6 +61,7 @@ class Internship(CamelModel):
 class Duty(CamelModel):
     text: str = Field(min_length=1, max_length=500)
     criticality: Criticality = Criticality.low
+    edited: bool = False          # 编辑锁定（§5.5）：用户手动修改 → 不可被自动重写
 
 
 class Project(CamelModel):
@@ -77,11 +78,13 @@ class Project(CamelModel):
 class ProjectItem(CamelModel):
     text: str = Field(min_length=1, max_length=500)
     criticality: Criticality = Criticality.low
+    edited: bool = False          # 编辑锁定（§5.5）
 
 
 class SummarySentence(CamelModel):
     text: str = Field(min_length=1, max_length=300)
     criticality: Criticality = Criticality.low
+    edited: bool = False          # 编辑锁定（§5.5）
 
 
 class Skill(CamelModel):

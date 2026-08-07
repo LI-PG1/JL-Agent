@@ -11,13 +11,21 @@ async def gen_summary(ctx: GenContext) -> dict:
         degrade={"sentences": []},
     )
     sentences = []
+    # 用户已编辑句子（§5.5）不重写：保留原文并优先排前，剩余空位由 LLM 补充
+    rest = 3
+    for s in (ctx.resume.get("summary") or []):
+        if not s.get("edited"):
+            continue
+        sentences.append({**normalize_text_item(s), "text": str(s.get("text", ""))[:300],
+                          "edited": True, "criticality": "critical"})
+        rest -= 1
     for s in as_list(parsed.get("sentences")):
+        if rest <= 0:
+            break
         text = str(s.get("text", "")).strip()
         if text:
-            sentences.append({
-                **normalize_text_item(s),
-                "text": text[:300],
-            })
+            sentences.append({**normalize_text_item(s), "text": text[:300]})
+            rest -= 1
     # 空降级兜底：至少保留 1 句（来自用户已有 summary）
     if not sentences and ctx.resume.get("summary"):
         sentences = [normalize_text_item({"text": s.get("text", "")})

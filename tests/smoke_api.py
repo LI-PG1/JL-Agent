@@ -204,5 +204,41 @@ else:
         r = httpx.get(f"{BASE}/api/task/{task_id}/events", timeout=10)
         check("SSE 回放含 task.canceled", r.status_code == 200 and "task.canceled" in r.text, r.text[:120])
 
+print("== 20. P6 编辑锁定 / 解锁 / 重装配（§5.5 / §6） ==")
+upd3 = build_resume(jobs=jobs1)
+upd3["summary"] = [{"text": "初始自我评价句。", "criticality": "low", "estimatedLines": 1}]
+r = httpx.put(f"{BASE}/api/resume/{rid3}", json=upd3, timeout=10)
+check("整存补 summary", r.status_code == 200 and r.json()["code"] == 0, str(r.json()))
+
+r = httpx.put(f"{BASE}/api/resume/{rid3}/item",
+              json={"block": "summary", "index": 0, "text": "编辑后的自我评价"}, timeout=10)
+j = r.json()
+check("item 编辑 200", r.status_code == 200 and j["code"] == 0, str(j))
+d = j["data"]
+check("edited 锁定生效（critical）", d["resume"]["summary"][0]["edited"] is True
+      and d["resume"]["summary"][0]["criticality"] == "critical", str(d["resume"]["summary"][0]))
+check("重装配 html 含编辑标记", 'data-block="summary" data-index="0"' in d["html"])
+
+r = httpx.put(f"{BASE}/api/resume/{rid3}/item",
+              json={"block": "project", "index": 0, "subIndex": 0, "text": "改过的项目要点"}, timeout=10)
+j = r.json()
+check("项目叶子编辑 200", r.status_code == 200 and j["code"] == 0, str(j))
+check("项目叶子锁定", j["data"]["resume"]["project"][0]["items"][0]["edited"] is True,
+      str(j["data"]["resume"]["project"][0]["items"][0]))
+
+r = httpx.put(f"{BASE}/api/resume/{rid3}/item",
+              json={"block": "education", "index": 0, "text": "x"}, timeout=10)
+check("不可编辑板块 → 40001", r.status_code == 400 and r.json()["code"] == 40001, str(r.json()))
+
+r = httpx.post(f"{BASE}/api/resume/{rid3}/item/unlock", json={"block": "summary", "index": 0}, timeout=10)
+check("解锁 edited=false", r.status_code == 200
+      and r.json()["data"]["resume"]["summary"][0]["edited"] is False, str(r.json()))
+
+r = httpx.post(f"{BASE}/api/resume/{rid3}/render", json={"density": "compact"}, timeout=10)
+check("render density=compact", r.status_code == 200
+      and 'data-density="compact"' in r.json()["data"]["html"], str(r.json()))
+r = httpx.get(f"{BASE}/api/resume/{rid3}", timeout=10)
+check("density 已持久化", r.json()["data"]["density"] == "compact", str(r.json()))
+
 print(f"\n结果: {ok} 通过, {fail} 失败")
 raise SystemExit(1 if fail else 0)

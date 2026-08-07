@@ -18,10 +18,22 @@ async def gen_internship(ctx: GenContext) -> dict:
     for it in as_list(parsed.get("items")):
         src = src_by_company.get(it.get("company", ""), {})
         duties = []
+        # 用户已编辑职责（§5.5）不重写：按来源公司保留原文，其余由 LLM 补充
+        seen = set()
+        for d in (src.get("duties") or []):
+            if not d.get("edited"):
+                continue
+            text = str(d.get("text", "")).strip()
+            if not text:
+                continue
+            duties.append({**normalize_text_item(d), "text": text[:300],
+                           "edited": True, "criticality": "critical"})
+            seen.add(text)
         for d in as_list(it.get("duties")):
             text = str(d.get("text", "")).strip()
-            if text:
+            if text and text not in seen:
                 duties.append({**normalize_text_item(d), "text": text[:300]})
+                seen.add(text)
         # 公司/职位/时间以用户原值为准，LLM 输出仅作措辞参考
         items.append({
             "company": src.get("company", it.get("company", "")),

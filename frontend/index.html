@@ -9,24 +9,165 @@
 <body>
 <div id="app">
   <header class="topbar">
-    <h1>JL-Agent</h1>
-    <span class="sub">简历生成工作台</span>
+    <div class="brand">
+      <h1>JL-Agent</h1>
+      <span class="sub">简历生成工作台</span>
+    </div>
+    <div class="top-right">
+      <span id="health-status">检测中…</span>
+    </div>
   </header>
+
   <main class="layout">
-    <section class="card">
-      <h2>服务状态</h2>
-      <p id="health-status">检测中…</p>
+    <!-- ================= 左列：工作台 ================= -->
+    <section class="col workbench">
+      <!-- 简历列表 -->
+      <div class="card">
+        <div class="card-head">
+          <h2>我的简历</h2>
+          <button id="btn-new" class="btn small" type="button">新建</button>
+        </div>
+        <ul id="resume-list" class="resume-list"></ul>
+      </div>
+
+      <!-- 简历表单 -->
+      <div class="card">
+        <div class="card-head">
+          <h2>简历信息</h2>
+          <span id="cur-resume" class="muted small"></span>
+        </div>
+        <div class="form">
+          <fieldset>
+            <legend>基本信息</legend>
+            <div class="grid">
+              <label>姓名<input id="f-name" maxlength="32" placeholder="张三"></label>
+              <label>年龄<input id="f-age" type="number" min="16" max="70" placeholder="24"></label>
+              <label>邮箱<input id="f-email" placeholder="name@mail.com"></label>
+              <label>电话<input id="f-phone" maxlength="20" placeholder="13800000000"></label>
+              <label>个人网页<input id="f-website" placeholder="https://"></label>
+              <label>常驻城市<input id="f-base" maxlength="50"></label>
+              <label>可实习时长<input id="f-duration" maxlength="50"></label>
+              <label>到岗时间<input id="f-start" maxlength="50"></label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>教育经历（1~3 条）</legend>
+            <div id="edu-rows"></div>
+            <button class="btn small" type="button" data-add="edu">+ 添加教育</button>
+          </fieldset>
+
+          <fieldset>
+            <legend>实习经历（0~2 条）</legend>
+            <div id="int-rows"></div>
+            <button class="btn small" type="button" data-add="int">+ 添加实习</button>
+          </fieldset>
+
+          <fieldset>
+            <legend>项目经验</legend>
+            <div id="proj-rows"></div>
+            <button class="btn small" type="button" data-add="proj">+ 添加项目</button>
+          </fieldset>
+
+          <fieldset>
+            <legend>技能特长</legend>
+            <div id="skill-rows"></div>
+            <button class="btn small" type="button" data-add="skill">+ 添加技能</button>
+          </fieldset>
+
+          <fieldset>
+            <legend>证书荣誉</legend>
+            <div id="honor-rows"></div>
+            <button class="btn small" type="button" data-add="honor">+ 添加荣誉</button>
+          </fieldset>
+
+          <fieldset>
+            <legend>目标岗位 JD（1~5 套）</legend>
+            <div id="job-rows"></div>
+            <button class="btn small" type="button" data-add="job">+ 添加 JD</button>
+          </fieldset>
+        </div>
+        <div class="actions">
+          <button id="btn-save" class="btn primary" type="button">保存简历</button>
+          <span id="save-status" class="muted small"></span>
+        </div>
+      </div>
+
+      <!-- 生成 -->
+      <div class="card">
+        <h2>生成</h2>
+        <div class="grid">
+          <label>页数
+            <select id="g-page">
+              <option value="one-page">一页</option>
+              <option value="two-pages">两页</option>
+            </select>
+          </label>
+          <label>水印
+            <select id="g-watermark">
+              <option value="practice">练习（有水印）</option>
+              <option value="formal">正式（无水印）</option>
+            </select>
+          </label>
+          <label class="chk"><input id="g-deep" type="checkbox"> 深度搜索</label>
+        </div>
+        <div class="actions">
+          <button id="btn-generate" class="btn primary" type="button" disabled>一键生成</button>
+          <button id="btn-cancel" class="btn danger" type="button" disabled>取消</button>
+        </div>
+        <div id="progress" class="progress-wrap hidden">
+          <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+          <div id="progress-text" class="muted small"></div>
+        </div>
+      </div>
     </section>
-    <section class="card">
-      <h2>表单模块（P2 起逐步接入）</h2>
-      <p class="placeholder">基础信息 / 教育经历 / 附加信息（实习·项目·技能·荣誉）/ 岗位 JD</p>
-    </section>
-    <section class="card">
-      <h2>生成与导出（P4 起逐步接入）</h2>
-      <p class="placeholder">一键生成 · 进度条 · 预览编辑 · 动态适配 · 水印/确认清单 · HTML/PDF 导出</p>
+
+    <!-- ================= 右列：预览 ================= -->
+    <section class="col preview-col">
+      <div class="card">
+        <div class="card-head">
+          <h2>预览</h2>
+          <div class="preview-tools">
+            <label>密度
+              <select id="p-density">
+                <option value="compact">紧凑</option>
+                <option value="normal" selected>标准</option>
+                <option value="loose">松散</option>
+              </select>
+            </label>
+            <button id="btn-adapt" class="btn small" type="button" disabled>自动适配</button>
+            <span id="adapt-info" class="muted small"></span>
+            <button id="btn-export" class="btn small" type="button" disabled>导出</button>
+          </div>
+        </div>
+        <div id="banner" class="banner hidden"></div>
+        <div class="preview-wrap">
+          <iframe id="preview" class="preview" title="简历预览"></iframe>
+          <div id="preview-empty" class="preview-empty">生成后在此预览<br>点击正文文字可编辑条目</div>
+        </div>
+        <div id="edit-tip" class="edit-tip hidden">编辑提示：点击预览正文中的文字即可编辑；已编辑条目会带「已锁定」标识，AI 生成不会覆盖。</div>
+      </div>
     </section>
   </main>
 </div>
+
+<!-- 条目编辑弹窗（§5.5） -->
+<div id="edit-modal" class="modal hidden">
+  <div class="modal-box">
+    <div class="card-head">
+      <h3 id="edit-title">编辑条目</h3>
+      <button id="edit-close" class="btn small" type="button">×</button>
+    </div>
+    <textarea id="edit-text" rows="4" maxlength="500"></textarea>
+    <div class="actions">
+      <button id="edit-unlock" class="btn danger" type="button" hidden>解锁（允许 AI 重写）</button>
+      <button id="edit-save" class="btn primary" type="button">保存并锁定</button>
+      <button id="edit-cancel" class="btn" type="button">取消</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/adapt.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

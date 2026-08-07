@@ -446,4 +446,162 @@ async def t4():
 
 
 asyncio.run(t4())
+
+# ================================================================ P6 编辑锁定（§5.5）+ data 标记装配
+from app.api.resume import _leaf
+from app.core.errors import E_PARAM
+
+
+class EditedProvider(DispatchProvider):
+    """项目 LLM 输出与种子同名，验证 edited 要点按名保留。"""
+
+    async def chat(self, messages, **kw):
+        text = json.dumps(messages, ensure_ascii=False)
+        if "项目经历撰写师" in text:
+            return json.dumps({"projects": [{
+                "name": "RAG 知识库", "role": "开发",
+                "startMonth": "2024.07", "endMonth": "2024.09",
+                "techStack": ["FastAPI", "Milvus"], "source": "polished",
+                "items": [{"text": "LLM 新写的一条要点。", "estimatedLines": 1}],
+            }]})
+        return await super().chat(messages, **kw)
+
+
+def seed_edited(storage: Storage) -> str:
+    rid = storage.new_resume_id()
+    data = {
+        "id": rid, "identity": "intern", "pageOption": "one-page", "density": "normal",
+        "basicInfo": {"name": "张三", "age": 24, "email": "a@b.com", "phone": "13800138000"},
+        "education": [{"school": "安徽大学", "major": "应用统计", "degree": "学士",
+                       "startMonth": "2020.09", "endMonth": "2024.06"}],
+        "internship": [{"company": "某科技公司", "position": "算法实习生",
+                        "startMonth": "2024.06", "endMonth": "2024.09",
+                        "duties": [{"text": "负责推理服务开发。", "criticality": "low", "estimatedLines": 1},
+                                   {"text": "用户已改职责。", "criticality": "critical", "edited": True, "estimatedLines": 1}]}],
+        "project": [{"name": "RAG 知识库", "role": "开发", "startMonth": "2024.07", "endMonth": "2024.09",
+                     "techStack": ["FastAPI", "Milvus"],
+                     "items": [{"text": "构建检索增强问答系统。", "criticality": "low", "estimatedLines": 1},
+                               {"text": "用户已改的要点。", "criticality": "critical", "edited": True, "estimatedLines": 1}]}],
+        "summary": [{"text": "用户已改的自我评价。", "criticality": "critical", "edited": True, "estimatedLines": 1},
+                    {"text": "普通句子。", "criticality": "low", "estimatedLines": 1}],
+        "honor": [],
+        "jobs": [{"title": "大模型应用开发实习生",
+                  "jdText": "负责 LLM Agent 与 RAG 系统开发，熟悉 Python、PyTorch、Docker"}],
+        "contentPlan": {"projectCount": 1},
+        "generation": {"deepSearch": False, "watermarkMode": "practice"},
+        "createdAt": "2026-01-01T00:00:00", "updatedAt": "2026-01-01T00:00:00",
+    }
+    storage.save_resume(data)
+    return rid
+
+
+async def t5():
+    tmp = tempfile.mkdtemp(prefix="jl_p6_")
+    try:
+        # ---------- A) 编辑锁定 / 解锁 / 重装配 API（§5.5 / §6） ----------
+        from fastapi.testclient import TestClient
+
+        from app.engine.cache import GenCache
+        from app.main import app as app_
+        with TestClient(app_) as client:
+            app_.state.storage = Storage(tmp)
+            app_.state.gen_cache = GenCache(tmp)
+            app_.state.config.paths.data_dir = tmp
+            app_.state.config.paths.templates_dir = str(ROOT / "templates")
+            s = app_.state.storage
+            rid = seed_edited(s)
+
+            # summary 编辑 + 锁定
+            r = client.put(f"/api/resume/{rid}/item",
+                           json={"block": "summary", "index": 0, "text": "编辑后的自我评价"})
+            body = r.json()
+            ok("item 编辑 200", r.status_code == 200, str(body))
+            d = body["data"]
+            ok("summary 锁定（edited+critical）", d["resume"]["summary"][0]["edited"] is True
+               and d["resume"]["summary"][0]["criticality"] == "critical", str(d["resume"]["summary"][0]))
+            ok("summary 文本更新", d["resume"]["summary"][0]["text"] == "编辑后的自我评价")
+            ok("重装配 html 带编辑定位标记", 'data-block="summary" data-index="0"' in d["html"])
+
+            # 实习叶子编辑（index + subIndex）
+            r = client.put(f"/api/resume/{rid}/item",
+                           json={"block": "internship", "index": 0, "subIndex": 0, "text": "改过的职责"})
+            d = client.put(f"/api/resume/{rid}/item",
+                           json={"block": "project", "index": 0, "subIndex": 0, "text": "改过的要点"}).json()["data"]
+            ok("项目叶子编辑锁定", d["resume"]["project"][0]["items"][0]["edited"] is True
+               and d["resume"]["project"][0]["items"][0]["criticality"] == "critical")
+
+            # 非法板块 / 越界 → 40001
+            r = client.put(f"/api/resume/{rid}/item",
+                           json={"block": "education", "index": 0, "text": "x"})
+            ok("不可编辑板块 → 40001", r.status_code == 400 and r.json()["code"] == E_PARAM, str(r.json()))
+            r = client.put(f"/api/resume/{rid}/item",
+                           json={"block": "summary", "index": 99, "text": "x"})
+            ok("下标越界 → 40001", r.status_code == 400 and r.json()["code"] == E_PARAM, str(r.json()))
+
+            # 解锁
+            r = client.post(f"/api/resume/{rid}/item/unlock", json={"block": "summary", "index": 0})
+            d = r.json()["data"]
+            ok("解锁 edited=false", d["resume"]["summary"][0]["edited"] is False, str(d["resume"]["summary"][0]))
+
+            # 重装配渲染 + density 持久化
+            r = client.post(f"/api/resume/{rid}/render", json={"density": "loose"})
+            d = r.json()["data"]
+            ok("render density 生效", 'data-density="loose"' in d["html"])
+            ok("density 已持久化", s.load_resume(rid)["density"] == "loose")
+
+            # _leaf 单元：不可编辑板块抛 40001
+            try:
+                _leaf({}, "skill", 0, None)
+                ok("_leaf 拦截不可编辑板块", False, "未抛错")
+            except AppError as exc:
+                ok("_leaf 拦截不可编辑板块", exc.code == E_PARAM, str(exc))
+
+        # ---------- B) 装配 data 标记 + summary 逐句渲染（§5.5 前端定位） ----------
+        asm = Assembler(str(ROOT / "templates"))
+        resume = {
+            "pageOption": "one-page", "basicInfo": {"name": "张三", "phone": "1", "email": "a@b.com"},
+            "education": [{"school": "安徽大学", "major": "应用统计", "degree": "学士",
+                           "startMonth": "2020.09", "endMonth": "2024.06"}],
+            "internship": [{"company": "某科技公司", "position": "算法实习生",
+                            "startMonth": "2024.06", "endMonth": "2024.09",
+                            "duties": [{"text": "职责 A。"}, {"text": "职责 B。"}]}],
+            "project": [{"name": "RAG 知识库", "role": "开发", "techStack": ["Milvus"],
+                         "items": [{"text": "要点 1。"}, {"text": "要点 2。"}]}],
+            "summary": [{"text": "句子 1。"}, {"text": "句子 2。"}],
+        }
+        html, _ = asm.render(resume, {}, density="normal", watermark_mode="formal")
+        ok("summary 逐句 data 标记", 'data-block="summary" data-index="0"' in html
+           and 'data-block="summary" data-index="1"' in html)
+        ok("实习职责 data 标记", 'data-block="internship" data-index="0" data-sub-index="1"' in html)
+        ok("项目要点 data 标记", 'data-block="project" data-index="0" data-sub-index="1"' in html)
+        ok("summary 容器 id=sec-summary", 'id="sec-summary"' in html)
+
+        r2 = dict(resume); r2["pageOption"] = "two-pages"
+        html2, _ = asm.render(r2, {}, density="normal", watermark_mode="formal")
+        ok("两页版 summary 逐句 <p>", html2.count('class="summary-sentence"') == 2
+           and '<p class="summary-sentence" data-block="summary" data-index="0">句子 1。</p>' in html2)
+
+        # ---------- C) 生成器保留 edited 条目（§5.5） ----------
+        provider = EditedProvider()
+        storage, _, runner = make_runner(tmp, provider)
+        rid2 = seed_edited(storage)
+        tid2 = make_task(storage, rid2)
+        await runner.run(tid2)
+        ok("编辑态任务 done", storage.load_task(tid2)["state"] == "done")
+
+        r = storage.load_resume(rid2)
+        ok("编辑句保留原文", any(s.get("edited") and s["text"] == "用户已改的自我评价。"
+                             for s in r["summary"]), str(r["summary"]))
+        ok("编辑句 criticality=critical", any(s.get("edited") and s["criticality"] == "critical"
+                                           for s in r["summary"]))
+        ok("LLM 新句未标记 edited", all(not s.get("edited") for s in r["summary"] if "用户已改" not in s.get("text", "")))
+        duties = r["internship"][0]["duties"]
+        ok("编辑职责保留", any(d.get("edited") and d["text"] == "用户已改职责。" for d in duties), str(duties))
+        p = r["project"][0]
+        ok("编辑项目要点按名保留", any(i.get("edited") and i["text"] == "用户已改的要点。" for i in p["items"]), str(p["items"]))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+asyncio.run(t5())
 print(f"\n逻辑验证: {passed} 通过")

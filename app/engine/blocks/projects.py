@@ -40,6 +40,11 @@ async def gen_projects(ctx: GenContext) -> dict:
         return {"projects": [], "degraded": True}
 
     seeds = _pick_seeds(ctx)
+    # 用户已编辑要点（§5.5）不重写：按项目名匹配保留原文
+    edited_by_name = {
+        str(p.get("name", "")).strip(): [i for i in (p.get("items") or []) if i.get("edited")]
+        for p in (ctx.resume.get("project") or [])
+    }
     # 种子数量不足以填满 → 需要创作空位
     skeleton = _skeleton(ctx) if len(seeds) < count else ""
     messages = projects_messages(
@@ -54,7 +59,20 @@ async def gen_projects(ctx: GenContext) -> dict:
         name = str(p.get("name", "")).strip()
         if not name:
             continue
-        items = [normalize_text_item(i) for i in as_list(p.get("items")) if str(i.get("text", "")).strip()]
+        items = []
+        seen = set()
+        for i in edited_by_name.get(name, []):
+            text = str(i.get("text", "")).strip()
+            if not text:
+                continue
+            items.append({**normalize_text_item(i), "text": text[:500],
+                          "edited": True, "criticality": "critical"})
+            seen.add(text)
+        for i in as_list(p.get("items")):
+            text = str(i.get("text", "")).strip()
+            if text and text not in seen:
+                items.append(normalize_text_item(i))
+                seen.add(text)
         # 数量约束：一页 2~4 条 / 两页 3~6 条
         if ctx.page_option == "one-page":
             items = items[:4] or [normalize_text_item({"text": "（待补充）"})]
@@ -79,7 +97,9 @@ async def gen_projects(ctx: GenContext) -> dict:
                 "name": seed.get("name", ""), "role": seed.get("role", "开发"),
                 "startMonth": seed.get("startMonth", ""), "endMonth": seed.get("endMonth", ""),
                 "techStack": list(seed.get("techStack") or []),
-                "items": [normalize_text_item({"text": i.get("text", "（待补充）")})
+                "items": [({**normalize_text_item(i), "text": str(i.get("text", ""))[:500],
+                            "edited": True, "criticality": "critical"}
+                           if i.get("edited") else normalize_text_item(i))
                           for i in (seed.get("items") or [])] or [normalize_text_item({"text": "（待补充）"})],
                 "source": "user-input", "aiFlag": False,
             })

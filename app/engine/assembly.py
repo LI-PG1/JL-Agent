@@ -121,11 +121,17 @@ class Assembler:
         sentences = [s for s in sentences if s]
         if not sentences:
             return ""
-        text = _esc("".join(sentences))
+        # 逐句渲染（§5.5）：data-block/data-index 供前端定位点击编辑
         if page_option == "two-pages":
-            return ('<div class="section">\n  <div class="sec-title">自我评价</div>\n'
-                    f'  <div class="item-body">{text}</div>\n</div>')
-        return f'<div class="summary">{text}</div>'
+            body = "\n".join(
+                f'  <p class="summary-sentence" data-block="summary" data-index="{i}">{_esc(s)}</p>'
+                for i, s in enumerate(sentences))
+            return ('<div class="section" id="sec-summary">\n  <div class="sec-title">自我评价</div>\n'
+                    f'  <div class="item-body">\n{body}\n  </div>\n</div>')
+        body = "\n".join(
+            f'  <span class="summary-sentence" data-block="summary" data-index="{i}">{_esc(s)}</span>'
+            for i, s in enumerate(sentences))
+        return f'<div class="summary" id="sec-summary">\n{body}\n</div>'
 
     def _education(self, resume: dict) -> str:
         items = []
@@ -147,8 +153,10 @@ class Assembler:
 
     def _internship(self, resume: dict) -> str:
         items = []
-        for it in (resume.get("internship") or []):
-            lis = "\n".join(f"        <li>{_esc(d.get('text'))}</li>" for d in (it.get("duties") or []))
+        for i, it in enumerate(resume.get("internship") or []):
+            lis = "\n".join(
+                f'        <li data-block="internship" data-index="{i}" data-sub-index="{j}">{_esc(d.get("text"))}</li>'
+                for j, d in enumerate(it.get("duties") or []))
             items.append(
                 '  <div class="item">\n'
                 '    <div class="item-head">\n'
@@ -166,12 +174,14 @@ class Assembler:
 
     def _projects(self, resume: dict) -> str:
         items = []
-        for p in (resume.get("project") or []):
+        for i, p in enumerate(resume.get("project") or []):
             tech = ""
             stack = [str(t) for t in (p.get("techStack") or []) if str(t).strip()]
             if stack:
                 tech = f'      <div class="tech"><b>技术栈：</b>{_esc("、".join(stack))}</div>\n'
-            lis = "\n".join(f"        <li>{_esc(x.get('text'))}</li>" for x in (p.get("items") or []))
+            lis = "\n".join(
+                f'        <li data-block="project" data-index="{i}" data-sub-index="{j}">{_esc(x.get("text"))}</li>'
+                for j, x in enumerate(p.get("items") or []))
             items.append(
                 '  <div class="item">\n'
                 '    <div class="item-head">\n'

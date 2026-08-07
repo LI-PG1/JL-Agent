@@ -1,4 +1,4 @@
-/* JL-Agent 基础样式（复用 MS-Agent 风格 token，P1 骨架） */
+/* JL-Agent 前端样式（P6：工作台 + 预览 + 适配 + 编辑锁定） */
 :root {
   --bg: #f5f6f8;
   --card: #ffffff;
@@ -7,6 +7,10 @@
   --accent: #1e3a5f;
   --line: #e5e7eb;
   --radius: 8px;
+  --danger: #b91c1c;
+  --warn-bg: #fff7ed;
+  --warn-line: #fdba74;
+  --warn-ink: #9a3412;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -14,25 +18,135 @@ body {
   background: var(--bg);
   color: var(--ink);
 }
+.hidden { display: none !important; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.ok { color: #15803d; }
+.bad { color: var(--danger); }
+
+/* ---------------- 顶栏 ---------------- */
 .topbar {
-  display: flex; align-items: baseline; gap: 12px;
-  padding: 14px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 24px;
   background: var(--card);
   border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 10;
 }
+.topbar .brand { display: flex; align-items: baseline; gap: 12px; }
 .topbar h1 { font-size: 18px; color: var(--accent); }
 .topbar .sub { color: var(--muted); font-size: 13px; }
+#health-status { font-size: 12px; }
+
+/* ---------------- 布局 ---------------- */
 .layout {
-  max-width: 960px; margin: 20px auto; padding: 0 16px;
-  display: flex; flex-direction: column; gap: 16px;
+  max-width: 1360px; margin: 20px auto; padding: 0 16px;
+  display: grid; grid-template-columns: minmax(420px, 1fr) minmax(480px, 1.2fr);
+  gap: 16px; align-items: start;
 }
+.col { display: flex; flex-direction: column; gap: 16px; }
 .card {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 18px;
+  padding: 16px 18px;
 }
-.card h2 { font-size: 15px; margin-bottom: 8px; }
-.placeholder { color: var(--muted); font-size: 13px; }
-.ok { color: #15803d; }
-.bad { color: #b91c1c; }
+.card h2 { font-size: 15px; }
+.card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.card-head h2 { margin: 0; }
+
+/* ---------------- 简历列表 ---------------- */
+.resume-list { list-style: none; margin-top: 6px; }
+.resume-list li {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px;
+  margin-bottom: 6px; cursor: pointer; font-size: 13px;
+}
+.resume-list li:hover { border-color: var(--accent); }
+.resume-list li.active { background: #eef2f7; border-color: var(--accent); }
+.resume-list .del { color: var(--muted); font-size: 12px; padding: 0 4px; }
+.resume-list .del:hover { color: var(--danger); }
+
+/* ---------------- 按钮 ---------------- */
+.btn {
+  border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.small { padding: 4px 10px; font-size: 12px; }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.danger { color: var(--danger); border-color: #fca5a5; }
+.btn.danger:hover { background: #fef2f2; }
+
+/* ---------------- 表单 ---------------- */
+fieldset {
+  border: 1px solid var(--line); border-radius: 6px;
+  padding: 10px 12px 12px; margin-top: 12px;
+}
+legend { font-size: 13px; font-weight: 600; color: var(--accent); padding: 0 6px; }
+.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 12px; margin-top: 6px; }
+label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+label.chk { flex-direction: row; align-items: center; gap: 6px; padding-top: 22px; }
+input, select, textarea {
+  border: 1px solid var(--line); border-radius: 6px;
+  padding: 6px 8px; font-size: 13px; color: var(--ink);
+  font-family: inherit; width: 100%;
+}
+textarea { resize: vertical; line-height: 1.5; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+.row { border: 1px dashed var(--line); border-radius: 6px; padding: 8px 10px; margin-top: 8px; position: relative; }
+.row .rm { position: absolute; top: 6px; right: 6px; }
+.row .rm:hover { color: var(--danger); }
+.row .grid { margin-top: 0; }
+.actions { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.actions .btn { min-width: 90px; }
+
+/* ---------------- 生成与进度 ---------------- */
+.progress-wrap { margin-top: 12px; }
+.progress-bar {
+  height: 8px; background: #eef0f3; border-radius: 4px; overflow: hidden;
+}
+.progress-fill {
+  height: 100%; width: 0; background: var(--accent);
+  transition: width .3s ease;
+}
+#progress-text { margin-top: 6px; }
+
+/* ---------------- 横幅（确认/提示） ---------------- */
+.banner {
+  margin-bottom: 10px; padding: 8px 12px;
+  background: var(--warn-bg); border: 1px solid var(--warn-line);
+  border-radius: 6px; color: var(--warn-ink); font-size: 12px; line-height: 1.5;
+}
+
+/* ---------------- 预览 ---------------- */
+.preview-tools { display: flex; align-items: center; gap: 10px; }
+.preview-tools label { flex-direction: row; align-items: center; gap: 6px; width: auto; }
+.preview-tools select { width: auto; }
+.preview-wrap {
+  position: relative; border: 1px solid var(--line); border-radius: 6px;
+  background: #eef0f3; height: 720px; overflow: hidden;
+}
+.preview {
+  width: 100%; height: 100%; border: 0; background: #fff;
+}
+.preview-empty {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 8px; color: var(--muted); font-size: 14px; text-align: center;
+}
+.edit-tip {
+  margin-top: 8px; padding: 6px 10px; background: #f0f6ff;
+  border: 1px solid #bcd7f5; border-radius: 6px; color: #1e4e8c; font-size: 12px;
+}
+
+/* ---------------- 弹窗 ---------------- */
+.modal {
+  position: fixed; inset: 0; background: rgba(15, 23, 42, .45);
+  display: flex; align-items: center; justify-content: center; z-index: 100;
+}
+.modal-box {
+  width: min(560px, 92vw); background: var(--card); border-radius: 10px;
+  padding: 16px 18px;
+}
+.modal-box h3 { font-size: 15px; }
+.modal-box textarea { margin-top: 10px; }
