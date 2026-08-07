@@ -1,0 +1,38 @@
+/* JL-Agent 基础样式（复用 MS-Agent 风格 token，P1 骨架） */
+:root {
+  --bg: #f5f6f8;
+  --card: #ffffff;
+  --ink: #1f2937;
+  --muted: #6b7280;
+  --accent: #1e3a5f;
+  --line: #e5e7eb;
+  --radius: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+}
+.topbar {
+  display: flex; align-items: baseline; gap: 12px;
+  padding: 14px 24px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+.topbar h1 { font-size: 18px; color: var(--accent); }
+.topbar .sub { color: var(--muted); font-size: 13px; }
+.layout {
+  max-width: 960px; margin: 20px auto; padding: 0 16px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+.card h2 { font-size: 15px; margin-bottom: 8px; }
+.placeholder { color: var(--muted); font-size: 13px; }
+.ok { color: #15803d; }
+.bad { color: #b91c1c; }
