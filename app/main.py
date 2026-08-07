@@ -14,12 +14,13 @@ from .api import search as search_api
 from .api import settings as settings_api
 from .api import skills as skills_api
 from .api import upload as upload_api
-from .config import load_config
+from .config import PROJECT_ROOT, load_config
 from .core.errors import AppError
 from .core.rules import RulesLoader
 from .engine.cache import GenCache
 from .search.api_search import ApiSearchClient
 from .storage import Storage
+from .version import __version__
 
 
 @asynccontextmanager
@@ -40,7 +41,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="JL-Agent", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="JL-Agent", version=__version__, lifespan=lifespan)
 
 
 @app.exception_handler(AppError)
@@ -58,7 +59,11 @@ def health():
     return {
         "code": 0,
         "message": "ok",
-        "data": {"status": "up", "rules": rules.versions},
+        "data": {
+            "status": "up",
+            "version": __version__,
+            "rules": rules.versions,
+        },
     }
 
 
@@ -71,4 +76,4 @@ app.include_router(adjust_api.router)
 app.include_router(settings_api.router)
 
 
-app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
+app.mount("/", StaticFiles(directory=str(PROJECT_ROOT / "frontend"), html=True), name="frontend")

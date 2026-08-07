@@ -2,7 +2,7 @@
 
 本地简历生成 Agent：输入少量个人背景 + 目标岗位 JD，一键生成专业、可打印、页面填满（无大面积空白）的 HTML 简历。
 
-> 开发状态：P1 骨架已就绪（FastAPI 后端 + 原生前端壳 + 规则库），生成引擎等核心能力按 [工程契约](docs/contract.md) 推进中。
+> 开发状态：核心功能已交付（R17~R21：时间约束、插件双层启动、高级设置抽屉、便携版分发、版本机制）。
 
 ## 核心特性
 
@@ -52,6 +52,20 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
 浏览器打开 <http://127.0.0.1:8000> 即进入简历工作台。
+
+### 免环境部署（无需安装 Python）
+
+| 方式 | 适用 | 说明 |
+|---|---|---|
+| **独立 EXE** | 大众用户（Windows 10/11） | 单文件自包含，双击即用：[EXE 安装指南与 FAQ](docs/EXE_GUIDE.md) |
+| **便携 ZIP** | 分享给朋友 / 无 Python 环境 | 内含嵌入式 Python + 依赖，解压双击 bat：[构建脚本](portable/build_portable.py) |
+
+### 版本更新
+
+- 版本号唯一来源：`app/version.py`（顶栏自动显示 `v<版本>`）。
+- 检查更新：`python scripts\update_check.py`（对比 GitHub Release latest tag）。
+
+详细部署、环境配置、更新与发布流程见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。
 
 ### 4. 使用流程
 

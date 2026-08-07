@@ -69,6 +69,10 @@ def load_config() -> Config:
     cfg.search = SearchApiCfg(**s) if s else cfg.search
     if raw.get("paths"):
         cfg.paths = Paths(**raw["paths"])
+    # EXE 打包场景（onefile 临时目录会漂移）：通过 JL_AGENT_DATA 将数据目录重定向到固定位置
+    data_env = os.environ.get("JL_AGENT_DATA")
+    if data_env:
+        cfg.paths.data_dir = data_env
     if raw.get("limits"):
         cfg.limits = Limits(**raw["limits"])
     return cfg

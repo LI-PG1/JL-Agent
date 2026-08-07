@@ -415,7 +415,7 @@ async def test_provider(body: TestBody, request: Request):
         "max_tokens": 1,
     }
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=6) as client:  # 测试连接最多等 6s
             r = await client.post(
                 f"{body.base_url.rstrip('/')}/chat/completions",
                 headers={"Authorization": f"Bearer {body.api_key}"},

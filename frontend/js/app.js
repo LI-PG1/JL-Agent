@@ -37,6 +37,8 @@
       if (j.code === 0) {
         el.textContent = "服务正常";
         el.className = "ok";
+        var vt = $id("ver-tag");
+        if (vt && j.data && j.data.version) vt.textContent = "v" + j.data.version;
       } else {
         el.textContent = "异常: " + j.message;
         el.className = "bad";
