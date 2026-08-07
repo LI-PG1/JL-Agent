@@ -200,6 +200,8 @@ input, select, textarea {
   font-family: inherit; width: 100%;
   background: #fafbfc;
 }
+/* r16：checkbox 不占满整行，文字与勾选框同一行显示 */
+input[type="checkbox"], input[type="radio"] { width: auto; flex: none; }
 textarea { resize: vertical; line-height: 1.6; }
 input:focus, select:focus, textarea:focus {
   outline: none; border-color: var(--accent);

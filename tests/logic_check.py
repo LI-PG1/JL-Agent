@@ -683,6 +683,30 @@ async def t6():
             })
             ok("新技能分类可保存", r.status_code == 200 and r.json()["code"] == 0, str(r.json()))
 
+            # r16 时间校验：开始不得晚于今天；结束不得晚于 2028-12
+            from app.core.errors import E_EDU_TIME
+            import datetime as _dt
+            _now = _dt.date.today()
+            _fut = _dt.date(_now.year, _now.month, 1).replace(month=_now.month + 1) if _now.month < 12 \
+                else _dt.date(_now.year + 1, 1, 1)
+            _fut_s = f"{_fut.year}.{_fut.month:02d}"
+            r = client.post("/api/resume", json={
+                "basicInfo": {"name": "王五", "age": 24, "email": "w@b.com", "phone": "13900000001"},
+                "education": [{"school": "城大", "major": "CS", "degree": "硕士",
+                               "startMonth": _fut_s, "endMonth": "2028.12"}],
+                "skill": [{"category": "专业技能", "name": "Python"}],
+                "jobs": [{"title": "t", "jdText": "jd"}],
+            })
+            ok("开始时间晚于今天被拦截", r.status_code == 400 and r.json()["code"] == E_EDU_TIME, str(r.json()))
+            r = client.post("/api/resume", json={
+                "basicInfo": {"name": "赵六", "age": 24, "email": "z@b.com", "phone": "13900000002"},
+                "education": [{"school": "城大", "major": "CS", "degree": "硕士",
+                               "startMonth": "2024.09", "endMonth": "2029.01"}],
+                "skill": [{"category": "专业技能", "name": "Python"}],
+                "jobs": [{"title": "t", "jdText": "jd"}],
+            })
+            ok("结束时间晚于 2028-12 被拦截", r.status_code == 400 and r.json()["code"] == E_EDU_TIME, str(r.json()))
+
             # 导出：JSON / DOCX / 非法格式
             r = client.get(f"/api/resume/{rid}/export?format=json")
             ok("导出 JSON 200", r.status_code == 200

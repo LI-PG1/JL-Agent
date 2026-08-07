@@ -220,7 +220,7 @@ class Assembler:
             name = str(h.get("name") or "").strip()
             if not name:
                 continue
-            seg = " · ".join(x for x in (_esc(name), _esc(h.get("org")), _esc(h.get("time"))) if x)
+            seg = " · ".join(x for x in (_esc(name), _esc(h.get("time"))) if x)
             parts.append(f'    <span class="honor">{seg}</span>')
         if not parts:
             return ""   # 空区块删除

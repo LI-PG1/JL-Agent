@@ -96,7 +96,6 @@ class Skill(CamelModel):
 
 class Honor(CamelModel):
     name: str = Field(min_length=1, max_length=128)
-    org: Optional[str] = Field(default=None, max_length=64)
     time: Optional[str] = Field(default=None, max_length=32)
     criticality: Criticality = Criticality.low
 

@@ -29,7 +29,7 @@
       <!-- 配置逻辑引导条（三步 + 高级设置可选） -->
       <div class="flow-steps">
         <div class="flow-step"><b><span class="fs-no">1</span>粘贴钥匙</b>填配置名称 / Base URL / API Key</div>
-        <div class="flow-step"><b><span class="fs-no">2</span>选择能力</b>文本 / 视觉（可留空）</div>
+        <div class="flow-step"><b><span class="fs-no">2</span>填写配置</b>模型名 / 服务地址</div>
         <div class="flow-step"><b><span class="fs-no">3</span>保存验证</b>自检通过即生效</div>
         <div class="flow-step optional"><b><span class="fs-no alt">4</span>高级设置（可选）</b>多模型管理 / 搜索 Key</div>
       </div>
@@ -52,13 +52,12 @@
         <summary>⚙ 高级设置（多模型配置管理 / 搜索 / 插件默认值）</summary>
         <div id="prov-list" class="prov-list"></div>
         <h4>新增配置</h4>
-        <div class="hint-line">主卡片每次保存一条配置；保存后 API Key 输入框自动清空，可继续粘贴下一个平台的 Key。列表顺序即调用优先级，激活项排最前。</div>
+        <div class="hint-line">列表顺序即调用优先级，激活项排最前。</div>
         <div class="grid">
           <label>配置名称<input id="p-name" maxlength="64" placeholder="如 my-key-2"></label>
           <label>模型名<input id="p-model" maxlength="128" placeholder="如 Qwen/Qwen2.5-72B-Instruct"></label>
           <label class="wide">Base URL<input id="p-baseurl" maxlength="256" placeholder="https://api.xxx.com/v1"></label>
           <label class="wide">API Key<input id="p-apikey" type="password" maxlength="512" placeholder="sk-..."></label>
-          <label>能力（text / vision，逗号分隔）<input id="p-cap" maxlength="64" value="text"></label>
         </div>
         <div class="actions">
           <button id="btn-add-provider" class="btn" type="button">添加配置</button>
@@ -104,7 +103,7 @@
             <label>邮箱<input id="f-email" placeholder="name@mail.com"></label>
             <label>电话<input id="f-phone" maxlength="20" placeholder="13800000000"></label>
             <label>个人网页<span class="opt">（可选）</span><input id="f-website" placeholder="https://"></label>
-            <label>常驻城市<span class="opt">（可选）</span><input id="f-base" maxlength="50"></label>
+            <label>期望城市<span class="opt">（可选）</span><input id="f-base" maxlength="50"></label>
             <label>可实习时长<span class="opt">（可选）</span><input id="f-duration" maxlength="50"></label>
             <label>到岗时间<span class="opt">（可选）</span><input id="f-start" maxlength="50"></label>
           </div>
