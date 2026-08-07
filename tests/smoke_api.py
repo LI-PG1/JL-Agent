@@ -240,5 +240,30 @@ check("render density=compact", r.status_code == 200
 r = httpx.get(f"{BASE}/api/resume/{rid3}", timeout=10)
 check("density 已持久化", r.json()["data"]["density"] == "compact", str(r.json()))
 
+print("== 21. 设置控制台 / 导出 / 列表字段 ==")
+r = httpx.get(f"{BASE}/api/settings", timeout=10)
+d = r.json()["data"]
+check("设置默认值（深度搜索开/水印无）", r.status_code == 200 and d["deepSearchDefault"] is True
+      and d["watermarkDefault"] == "formal", str(d))
+r = httpx.put(f"{BASE}/api/settings", json={"apiKey": "sk-smoke-abcdef123456", "deepSearchDefault": True,
+                                            "watermarkDefault": "formal"}, timeout=10)
+d = r.json()["data"]
+check("设置保存 + Key 脱敏", r.status_code == 200 and d["hasKey"] is True
+      and "sk-s" in d["apiKeyMasked"] and "****" in d["apiKeyMasked"], str(d))
+r = httpx.put(f"{BASE}/api/settings", json={"apiKey": ""}, timeout=10)
+check("清空 Key", r.json()["data"]["hasKey"] is False)
+
+r = httpx.get(f"{BASE}/api/resume/{rid3}/export?format=json", timeout=10)
+check("导出 JSON", r.status_code == 200 and "application/json" in r.headers.get("content-type", ""), str(r.status_code))
+r = httpx.get(f"{BASE}/api/resume/{rid3}/export?format=docx", timeout=10)
+check("导出 DOCX", r.status_code == 200 and "wordprocessingml" in r.headers.get("content-type", "")
+      and len(r.content) > 100, str(r.status_code))
+r = httpx.get(f"{BASE}/api/resume/{rid3}/export?format=html", timeout=10)
+check("导出非法格式 → 40001", r.status_code == 400 and r.json()["code"] == 40001, str(r.json()))
+
+r = httpx.get(f"{BASE}/api/resume", timeout=10)
+item = next((x for x in r.json()["data"]["items"] if x["id"] == rid3), None)
+check("列表含方向+本地位置", item is not None and item["file"] == f"data/resumes/{rid3}.json", str(item))
+
 print(f"\n结果: {ok} 通过, {fail} 失败")
 raise SystemExit(1 if fail else 0)

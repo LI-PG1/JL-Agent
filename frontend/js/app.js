@@ -50,17 +50,30 @@
       (j.data.items || []).forEach(function (it) {
         var li = document.createElement("li");
         if (state.resumeId === it.id) li.className = "active";
-        var nameEl = document.createElement("span");
-        nameEl.textContent = (it.name || "未命名") + " · " + (it.updated_at || "").slice(0, 10);
-        li.appendChild(nameEl);
+        var main = document.createElement("div");
+        main.className = "li-main";
+        main.textContent = (it.name || "未命名") + (it.direction ? " · " + it.direction : "");
+        var sub = document.createElement("div");
+        sub.className = "li-sub";
+        sub.textContent = "更新于 " + (it.updated_at || "").slice(0, 16).replace("T", " ") +
+          " · " + (it.file || "");
         var del = document.createElement("span");
         del.className = "del";
         del.textContent = "删除";
         del.addEventListener("click", function (ev) {
           ev.stopPropagation();
-          if (!confirm("确认删除该简历？")) return;
-          fetch("/api/resume/" + it.id, { method: "DELETE" }).then(loadList).catch(function () {});
+          // 乐观删除（§r3）：立即移除条目，后台请求；失败回滚为真实列表
+          ul.removeChild(li);
+          fetch("/api/resume/" + it.id, { method: "DELETE" })
+            .then(function (r) { return r.json(); })
+            .then(function (jr) {
+              if (jr.code !== 0) { loadList(); return; }
+              if (state.resumeId === it.id) newResume();
+            })
+            .catch(function () { loadList(); });
         });
+        li.appendChild(main);
+        li.appendChild(sub);
         li.appendChild(del);
         li.addEventListener("click", function () { openResume(it.id); });
         ul.appendChild(li);
@@ -86,9 +99,8 @@
       state.config = null;
       state.html = null;
       fillForm(j.data);
-      $id("cur-resume").textContent = j.data.id || id;
+      $id("cur-resume").textContent = ((j.data.basicInfo || {}).name || "未命名");
       $id("btn-generate").disabled = false;
-      $id("p-density").value = j.data.density || "normal";
       loadList();
     }).catch(function (e) { alert("打开简历失败：" + e.message); });
   }
@@ -96,7 +108,9 @@
   /* ---------------- 表单行模板 ---------------- */
   // 枚举值与后端一致（§3.4）：degree/category 使用中文 value
   var DEGREES = [["专科", "专科"], ["学士", "学士"], ["硕士", "硕士"], ["博士", "博士"]];
-  var CATS = [["专业技能", "专业技能"], ["工具与框架", "工具与框架"], ["语言能力", "语言能力"]];
+  var CATS = [["专业技能", "专业技能"], ["工具与框架", "工具与框架"], ["语言能力", "语言能力"],
+              ["算法与模型", "算法与模型"], ["数据与统计", "数据与统计"], ["工程实践", "工程实践"],
+              ["证书资质", "证书资质"], ["兴趣爱好", "兴趣爱好"], ["其他能力", "其他能力"]];
   var ROW_TMPL = {
     edu: '<div class="grid">' +
       '<label>学校<input class="in-school" maxlength="64"></label>' +
@@ -294,13 +308,50 @@
       if (j.code !== 0) throw new Error(errMsg(j));
       if (!state.resumeId) {
         state.resumeId = j.data.resumeId;
-        $id("cur-resume").textContent = j.data.resumeId;
       }
+      $id("cur-resume").textContent = $id("f-name").value.trim() || "未命名";
       status.textContent = "已保存 " + new Date().toLocaleTimeString();
       $id("btn-generate").disabled = false;
-      return loadList();
+      loadList();
     }).catch(function (e) {
       status.textContent = "保存失败：" + e.message;
+    });
+  }
+
+  /* ---------------- 设置控制台（API Key / 插件默认值） ---------------- */
+  function loadSettings() {
+    return fetch("/api/settings").then(function (r) { return r.json(); }).then(function (j) {
+      if (j.code !== 0) throw new Error(errMsg(j));
+      var d = j.data;
+      $id("settings-status").textContent = d.hasKey ? ("Key 已配置：" + d.apiKeyMasked) : "未配置模型 Key";
+      $id("s-deep").checked = d.deepSearchDefault !== false;
+      $id("s-watermark-formal").checked = d.watermarkDefault !== "practice";
+      // 同步生成条默认值
+      $id("g-deep").checked = d.deepSearchDefault !== false;
+      $id("g-watermark").value = d.watermarkDefault === "practice" ? "practice" : "formal";
+    }).catch(function () {});
+  }
+
+  function saveSettings() {
+    var body = {
+      deepSearchDefault: $id("s-deep").checked,
+      watermarkDefault: $id("s-watermark-formal").checked ? "formal" : "practice",
+    };
+    var key = $id("s-apikey").value.trim();
+    if (key) body.apiKey = key;
+    fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j.code !== 0) throw new Error(errMsg(j));
+      $id("s-apikey").value = "";
+      $id("settings-status").textContent = j.data.hasKey ? ("Key 已配置：" + j.data.apiKeyMasked) : "未配置模型 Key";
+      $id("settings-hint").textContent = "已保存 " + new Date().toLocaleTimeString();
+      $id("g-deep").checked = $id("s-deep").checked;
+      $id("g-watermark").value = $id("s-watermark-formal").checked ? "formal" : "practice";
+    }).catch(function (e) {
+      $id("settings-hint").textContent = "保存失败：" + e.message;
     });
   }
 
@@ -409,9 +460,11 @@
   /* ---------------- 初始化 ---------------- */
   function init() {
     health();
+    loadSettings();
     loadList();
     $id("btn-new").addEventListener("click", newResume);
     $id("btn-save").addEventListener("click", saveResume);
+    $id("btn-save-settings").addEventListener("click", saveSettings);
     $id("btn-generate").addEventListener("click", startGenerate);
     $id("btn-cancel").addEventListener("click", cancelTask);
     document.querySelectorAll("[data-add]").forEach(function (btn) {

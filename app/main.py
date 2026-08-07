@@ -1,4 +1,5 @@
 """JL-Agent 后端入口：/api/health + 静态前端 + 规则加载 + P2 CRUD。"""
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime
 
@@ -10,6 +11,7 @@ from .api import adjust as adjust_api
 from .api import generate as generate_api
 from .api import resume as resume_api
 from .api import search as search_api
+from .api import settings as settings_api
 from .api import skills as skills_api
 from .api import upload as upload_api
 from .config import load_config
@@ -28,6 +30,10 @@ async def lifespan(app: FastAPI):
     app.state.config = cfg
     app.state.rules = rules
     app.state.storage = Storage(cfg.paths.data_dir)
+    # 设置控制台（§5.4）：已保存的 API Key 注入环境变量，provider 按 os.getenv 读取
+    saved = app.state.storage.load_settings()
+    if saved.get("apiKey"):
+        os.environ[cfg.provider.api_key_env] = saved["apiKey"]
     app.state.search_client = ApiSearchClient(cfg)
     app.state.gen_cache = GenCache(cfg.paths.data_dir)
     app.state.now = lambda: datetime.now().astimezone().isoformat(timespec="seconds")
@@ -62,6 +68,7 @@ app.include_router(skills_api.router)
 app.include_router(search_api.router)
 app.include_router(generate_api.router)
 app.include_router(adjust_api.router)
+app.include_router(settings_api.router)
 
 
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")

@@ -7,6 +7,7 @@
 """
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -604,4 +605,87 @@ async def t5():
 
 
 asyncio.run(t5())
+
+
+# ================================================================ R7 设置控制台 / 导出 / 技能分类扩容
+from app.core.errors import E_EXPORT
+
+
+async def t6():
+    tmp = tempfile.mkdtemp(prefix="jl_p7_")
+    env_key = "DEEPSEEK_API_KEY"
+    env_bak = os.environ.get(env_key)
+    try:
+        from fastapi.testclient import TestClient
+
+        from app.engine.cache import GenCache
+        from app.main import app as app_
+        with TestClient(app_) as client:
+            app_.state.storage = Storage(tmp)
+            app_.state.gen_cache = GenCache(tmp)
+            app_.state.config.paths.data_dir = tmp
+            app_.state.config.paths.templates_dir = str(ROOT / "templates")
+            s = app_.state.storage
+            rid = seed_edited(s)
+            env_actual = app_.state.config.provider.api_key_env
+
+            # 设置：默认值 + 保存 API Key（脱敏）+ 默认深度搜索/水印
+            r = client.get("/api/settings")
+            d = r.json()["data"]
+            ok("设置默认值（深度搜索开/水印无）", d["deepSearchDefault"] is True
+               and d["watermarkDefault"] == "formal", str(d))
+            r = client.put("/api/settings", json={"apiKey": "sk-test-1234567890abcd",
+                                                  "deepSearchDefault": False,
+                                                  "watermarkDefault": "practice"})
+            d = r.json()["data"]
+            ok("设置保存 + Key 脱敏", r.status_code == 200 and d["hasKey"] is True
+               and "sk-t" in d["apiKeyMasked"] and "****" in d["apiKeyMasked"], str(d))
+            ok("Key 已注入环境变量", os.getenv(env_actual) == "sk-test-1234567890abcd")
+            r = client.get("/api/settings")
+            d = r.json()["data"]
+            ok("设置持久化回读", d["deepSearchDefault"] is False and d["watermarkDefault"] == "practice", str(d))
+            r = client.put("/api/settings", json={"apiKey": ""})
+            ok("清空 Key 生效", r.json()["data"]["hasKey"] is False)
+            ok("清空后环境变量移除", os.getenv(env_actual) is None)
+
+            # 技能分类扩容：新枚举值可通过 Resume 校验并保存
+            r = client.post("/api/resume", json={
+                "basicInfo": {"name": "李四", "age": 25, "email": "l@b.com", "phone": "13900000000"},
+                "education": [{"school": "城大", "major": "CS", "degree": "硕士",
+                               "startMonth": "2024.09", "endMonth": "2026.06"}],
+                "skill": [{"category": "算法与模型", "name": "Transformer"}],
+                "jobs": [{"title": "t", "jdText": "jd"}],
+            })
+            ok("新技能分类可保存", r.status_code == 200 and r.json()["code"] == 0, str(r.json()))
+
+            # 导出：JSON / DOCX / 非法格式
+            r = client.get(f"/api/resume/{rid}/export?format=json")
+            ok("导出 JSON 200", r.status_code == 200
+               and r.headers["content-type"].startswith("application/json"), str(r.headers.get("content-type")))
+            try:
+                payload = r.json()
+                ok("导出 JSON 内容完整", payload.get("basicInfo", {}).get("name") == "张三", str(list(payload)[:5]))
+            except Exception:
+                ok("导出 JSON 内容完整", False, "非 JSON 响应")
+            r = client.get(f"/api/resume/{rid}/export?format=docx")
+            ok("导出 DOCX 200（python-docx）", r.status_code == 200
+               and "wordprocessingml" in r.headers.get("content-type", "")
+               and len(r.content) > 100, str(r.status_code))
+            r = client.get(f"/api/resume/{rid}/export?format=pdf")
+            ok("导出非法格式 → 40001", r.status_code == 400 and r.json()["code"] == E_PARAM, str(r.json()))
+
+            # 列表字段：direction + file（本地存储位置）
+            r = client.get("/api/resume")
+            item = next((x for x in r.json()["data"]["items"] if x["id"] == rid), None)
+            ok("列表含本地存储位置", item is not None and item["file"] == f"data/resumes/{rid}.json"
+               and item["name"] == "张三", str(item))
+    finally:
+        if env_bak is None:
+            os.environ.pop(env_key, None)
+        else:
+            os.environ[env_key] = env_bak
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+asyncio.run(t6())
 print(f"\n逻辑验证: {passed} 通过")

@@ -308,26 +308,32 @@
     b.style.color = isError ? "#b91c1c" : "";
   }
 
-  /* ---------------- 导出占位（E8，P8 完善） ---------------- */
-  function exportHtml() {
-    if (!state.html) return;
-    var w = window.open("", "_blank");
-    w.document.write(state.html);
-    w.document.close();
-    w.focus();
-    setTimeout(function () { w.print(); }, 300);
+  /* ---------------- 导出（§7 E8）：PDF=打印 / DOCX / JSON=后端文件） ---------------- */
+  function exportResume() {
+    if (!state.html && !state.resumeId) return;
+    var fmt = $id("p-export-fmt").value || "pdf";
+    if (fmt === "pdf") {
+      if (!state.html) return;
+      var w = window.open("", "_blank");
+      w.document.write(state.html);
+      w.document.close();
+      w.focus();
+      setTimeout(function () { w.print(); }, 300);
+      return;
+    }
+    if (!state.resumeId) return;
+    var a = document.createElement("a");
+    a.href = "/api/resume/" + state.resumeId + "/export?format=" + fmt;
+    a.download = "";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
 
   /* ---------------- 初始化 ---------------- */
   function init() {
     $id("btn-adapt").addEventListener("click", run);
-    $id("p-density").addEventListener("change", function (ev) {
-      var d = ev.target.value;
-      applyDensity(d);
-      state.density = d;
-      syncDensity(d).catch(function () {});
-    });
-    $id("btn-export").addEventListener("click", exportHtml);
+    $id("btn-export").addEventListener("click", exportResume);
     $id("edit-save").addEventListener("click", saveEdit);
     $id("edit-unlock").addEventListener("click", unlockEdit);
     $id("edit-cancel").addEventListener("click", closeModal);

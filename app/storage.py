@@ -98,6 +98,31 @@ class Storage:
         path.write_bytes(data)
         return str(Path("data") / "photos" / path.name)
 
+    # ------------------------------------------------------------ Settings（§5 设置控制台）
+    _DEFAULT_SETTINGS = {
+        "apiKey": "",
+        "deepSearchDefault": True,
+        "watermarkDefault": "formal",
+    }
+
+    def load_settings(self) -> dict:
+        path = self.root / "settings.json"
+        if not path.exists():
+            return dict(self._DEFAULT_SETTINGS)
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return dict(self._DEFAULT_SETTINGS)
+        merged = dict(self._DEFAULT_SETTINGS)
+        merged.update({k: v for k, v in data.items() if k in merged})
+        return merged
+
+    def save_settings(self, settings: dict) -> None:
+        path = self.root / "settings.json"
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
+        os.replace(tmp, path)
+
     @staticmethod
     def photo_to_data_url(file_path: str) -> str:
         """读取照片文件并编码为 data URL（供预览与模板注入）。"""

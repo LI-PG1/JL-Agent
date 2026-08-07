@@ -66,6 +66,12 @@ class SkillCategory(str, Enum):
     professional = "专业技能"
     tools = "工具与框架"
     language = "语言能力"
+    algorithm = "算法与模型"
+    data = "数据与统计"
+    engineering = "工程实践"
+    certificate = "证书资质"
+    interest = "兴趣爱好"
+    other = "其他能力"
 
 
 class SkillLevel(str, Enum):

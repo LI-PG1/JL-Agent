@@ -1,10 +1,12 @@
-"""Resume CRUD（契约 §4.2）：POST/GET/PUT/DELETE + 列表 + 条目编辑锁定（§5.5）+ 重装配渲染（§6）。"""
+"""Resume CRUD（契约 §4.2）：POST/GET/PUT/DELETE + 列表 + 条目编辑锁定（§5.5）+ 重装配渲染（§6）+ 导出（§7 E8）。"""
+import json
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from ..core.errors import AppError, E_PARAM
+from ..core.errors import AppError, E_EXPORT, E_PARAM
 from ..core.validation import check_resume
 from ..engine.assembly import Assembler
 from ..schemas import CamelModel, Resume
@@ -26,7 +28,9 @@ class DeletedResp(BaseModel):
 class ResumeListItem(BaseModel):
     id: str
     name: str = ""
+    direction: str = ""
     updated_at: Optional[str] = None
+    file: str = ""     # 本地存储位置（相对路径，供 UI 展示）
 
 
 class ItemEditBody(CamelModel):
@@ -69,7 +73,10 @@ def list_resumes(request: Request):
     for rid in storage.list_resumes():
         data = storage.load_resume(rid)
         name = (data.get("basicInfo") or {}).get("name", "")
-        items.append(ResumeListItem(id=rid, name=name, updated_at=data.get("updatedAt")).model_dump())
+        direction = data.get("direction") or ""
+        items.append(ResumeListItem(id=rid, name=name, direction=direction,
+                                    updated_at=data.get("updatedAt"),
+                                    file=f"data/resumes/{rid}.json").model_dump())
     items.sort(key=lambda x: x["updated_at"] or "", reverse=True)
     return {"code": 0, "message": "ok", "data": {"items": items}}
 
@@ -181,3 +188,71 @@ def render_resume(resume_id: str, body: RenderBody, request: Request):
         resume["updatedAt"] = request.app.state.now()
         storage.save_resume(resume)
     return _rendered(resume, request.app)
+
+
+# ---------------------------------------------------------------- 导出（§7 E8：PDF / DOCX / JSON）
+
+
+def _resume_to_docx(resume: dict) -> bytes:
+    """最小可用 DOCX：结构化区块 + 要点列表（python-docx）。"""
+    from io import BytesIO
+
+    import docx
+
+    document = docx.Document()
+    info = resume.get("basicInfo") or {}
+    document.add_heading(info.get("name") or "简历", level=0)
+    contact = " | ".join(str(x) for x in
+                         [info.get("phone"), info.get("email"), info.get("base"),
+                          info.get("website")] if x)
+    if contact:
+        document.add_paragraph(contact)
+
+    def section(title: str, lines: list) -> None:
+        lines = [str(x).strip() for x in lines if str(x).strip()]
+        if not lines:
+            return
+        document.add_heading(title, level=1)
+        for ln in lines:
+            document.add_paragraph(ln, style="List Bullet")
+
+    section("自我评价", [s.get("text") for s in (resume.get("summary") or [])])
+    section("教育经历", [
+        f"{e.get('school')} · {e.get('major')}（{e.get('degree')}）"
+        f"{e.get('startMonth')} - {e.get('endMonth')}" for e in (resume.get("education") or [])])
+    for it in (resume.get("internship") or []):
+        section(f"实习经历：{it.get('company')} · {it.get('position')}",
+                [d.get("text") for d in (it.get("duties") or [])])
+    for p in (resume.get("project") or []):
+        tech = "、".join(p.get("techStack") or [])
+        section(f"项目经验：{p.get('name')}（{tech}）",
+                [x.get("text") for x in (p.get("items") or [])])
+    section("技能特长", [s.get("name") for s in (resume.get("skill") or [])])
+    section("证书荣誉", [h.get("name") for h in (resume.get("honor") or [])])
+
+    buf = BytesIO()
+    document.save(buf)
+    return buf.getvalue()
+
+
+@router.get("/{resume_id}/export", response_model=dict)
+def export_resume(resume_id: str, request: Request, format: str = "json"):
+    """导出：format=json（结构化数据）/ docx（Word 文档）/ pdf（由前端打印生成）。"""
+    storage = request.app.state.storage
+    resume = storage.load_resume(resume_id)
+    fmt = format.lower()
+    if fmt == "json":
+        data = json.dumps(resume, ensure_ascii=False, indent=2).encode("utf-8")
+        return Response(
+            content=data, media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="{resume_id}.json"'})
+    if fmt == "docx":
+        try:
+            content = _resume_to_docx(resume)
+        except ImportError:
+            raise AppError(E_EXPORT, "DOCX 导出需要安装 python-docx（pip install python-docx）")
+        return Response(
+            content=content,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f'attachment; filename="{resume_id}.docx"'})
+    raise AppError(E_PARAM, "不支持的导出格式", {"format": fmt})
