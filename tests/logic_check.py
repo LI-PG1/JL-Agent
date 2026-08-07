@@ -273,6 +273,11 @@ async def t3():
             ok(f"block.done[{blk}] 已发", any(e["event"] == "block.done" and e["data"].get("block") == blk for e in task["events"]))
         ok("终态事件 task.done", "task.done" in names, str(names))
 
+        ev_done = next((e for e in task["events"] if e["event"] == "task.done"), None)
+        ok("task.done 注入装配 html", bool(ev_done) and "个人简历" in ev_done["data"].get("html", ""))
+        ok("config 预算基线（projects）", bool(ev_done)
+           and ev_done["data"]["config"]["blocks"].get("projects", 0) > 0)
+
         r = storage.load_resume(rid)
         ok("自我评价 2 句写回", len(r["summary"]) == 2)
         ok("实习润色写回（公司原值）", r["internship"][0]["company"] == "某科技公司" and "延迟" in r["internship"][0]["duties"][0]["text"])
@@ -334,4 +339,111 @@ async def t3():
 
 
 asyncio.run(t3())
+
+# ================================================================ P5 适配闭环（§6 / §5.3 校准）
+import statistics
+
+from app.api.adjust import _decide_action, _next_density
+from app.engine.assembly import Assembler
+
+
+async def t4():
+    tmp = tempfile.mkdtemp(prefix="jl_p5_")
+    try:
+        # 1) 判定纯函数（§6.7 阈值）
+        ok("action=over（>100% 溢出）", _decide_action(1.1) == "over")
+        ok("action=under（<75% 不足）", _decide_action(0.6) == "under")
+        ok("action=ok（75%~100%）", _decide_action(0.85) == "ok")
+        ok("density over → 更紧凑", _next_density("normal", "over") == "compact")
+        ok("density under → 更松散", _next_density("normal", "under") == "loose")
+        ok("density 边界不越界", _next_density("compact", "over") == "compact"
+           and _next_density("loose", "under") == "loose")
+
+        # 2) 多块校准（§5.3：校准行 + 中位数校正系数）
+        bt = BudgetTracker(tmp)
+        bt.record_estimated("summary", {"sentences": [{"text": "a", "estimatedLines": 3}]})
+        bt.record_estimated("projects", {"projects": [{"items": [{"text": "b", "estimatedLines": 2}]}]})
+        f1 = bt.record_actual("summary", 4)               # ratio = 4/3
+        f2 = bt.record_actual("projects", 1)              # ratio = 1/2
+        ok("summary 校正系数", abs(f1 - 1.333) < 0.001, str(f1))
+        ok("projects 校正系数", abs(f2 - 0.5) < 0.001, str(f2))
+        rows = json.loads((Path(tmp) / "calibration.json").read_text(encoding="utf-8"))
+        ok("校准行落盘 ×2", len(rows) == 2 and rows[0]["blockType"] == "summary", str(rows))
+        bt.record_estimated("summary", {"sentences": [{"text": "c", "estimatedLines": 2}]})
+        bt.record_actual("summary", 1, estimated_lines=2)  # ratio = 0.5 → 中位数(1.333, 0.5)
+        expect = round(statistics.median([1.333, 0.5]), 3)
+        ok("校正系数 = 历史中位数", abs(bt.factor("summary") - expect) < 0.001, str(bt.factor("summary")))
+
+        # 3) 模板装配（占位符替换/空区块删除/水印/照片位）
+        asm = Assembler(str(ROOT / "templates"))
+        resume = {
+            "pageOption": "one-page", "direction": "AI Agent",
+            "basicInfo": {"name": "张三", "phone": "13800138000", "email": "a@b.com"},
+            "education": [{"school": "安徽大学", "major": "应用统计", "degree": "学士",
+                           "startMonth": "2020.09", "endMonth": "2024.06"}],
+            "internship": [{"company": "某科技公司", "position": "算法实习生",
+                            "startMonth": "2024.06", "endMonth": "2024.09",
+                            "duties": [{"text": "优化推理延迟。"}]}],
+            "project": [{"name": "RAG 知识库", "role": "开发", "techStack": ["Milvus"],
+                         "items": [{"text": "构建问答系统。"}]}],
+            "skill": [{"category": "专业技能", "name": "Python"},
+                      {"category": "工具与框架", "name": "Docker"}],
+            "honor": [{"name": "国家奖学金"}],
+            "summary": [{"text": "扎实的工程能力。"}],
+        }
+        blocks = {"projects": {"projects": [{"items": [{"text": "x", "estimatedLines": 2}]}]}}
+        html, cfg = asm.render(resume, blocks, density="normal", watermark_mode="practice")
+        ok("装配含姓名", "张三个人简历" in html)
+        ok("data-density 注入", 'data-density="normal"' in html)
+        ok("实习区块渲染", 'id="sec-internship"' in html)
+        ok("项目区块渲染（含技术栈）", 'id="sec-projects"' in html and "技术栈" in html)
+        ok("技能分类行", 'class="skill-cat">专业技能' in html)
+        ok("荣誉区块渲染", 'id="sec-honors"' in html)
+        ok("水印开启（practice）", 'class="watermark on"' in html)
+        ok("config 预算基线 projects=2", cfg["blocks"]["projects"] == 2, str(cfg["blocks"]))
+
+        r2 = dict(resume)
+        r2["internship"], r2["honor"] = [], []
+        html2, _ = asm.render(r2, {}, density="normal", watermark_mode="formal")
+        ok("空实习区块删除", "sec-internship" not in html2)
+        ok("空荣誉区块删除", "sec-honors" not in html2)
+        ok("formal 无水印", "watermark on" not in html2)
+
+        # 4) /api/adjust 全链路（TestClient + 临时 data 覆盖）
+        from fastapi.testclient import TestClient
+
+        from app.engine.cache import GenCache
+        from app.main import app as app_
+        from app.storage import Storage
+        with TestClient(app_) as client:
+            app_.state.storage = Storage(tmp)
+            app_.state.gen_cache = GenCache(tmp)
+            app_.state.config.paths.data_dir = tmp
+            s = app_.state.storage
+            tid = s.new_task_id()
+            s.save_task({"id": tid, "resumeId": "r1", "state": "done", "progress": 1.0,
+                         "stage": "building", "stageIndex": 2, "stageTotal": 3, "events": []})
+            r = client.post("/api/adjust", json={
+                "taskId": tid,
+                "measurement": {"fillRatio": 1.2,
+                                "blocks": [{"block": "projects", "actualLines": 9, "estimatedLines": 6}]},
+                "config": {"density": "normal"}, "round": 1,
+            })
+            body = r.json()
+            ok("adjust 200", r.status_code == 200, str(body))
+            ok("action=over", body["data"]["action"] == "over", str(body["data"]))
+            ok("density 建议 compact", body["data"]["config"]["density"] == "compact")
+            ok("超差标记 drifted", body["data"]["drifted"] is True)
+            t = s.load_task(tid)
+            ev = [e for e in t["events"] if e["event"] == "task.adjust"]
+            ok("task.adjust 事件持久化", len(ev) == 1 and ev[0]["data"]["action"] == "over", str(ev))
+            rows2 = json.loads((Path(tmp) / "calibration.json").read_text(encoding="utf-8"))
+            ok("adjust 实测校准行写入", any(x.get("actualLines") == 9 for x in rows2), str(rows2))
+            r404 = client.post("/api/adjust", json={"taskId": "nope", "measurement": {"fillRatio": 0.9}})
+            ok("adjust 任务不存在 → 40008", r404.status_code == 400 and r404.json()["code"] == 40008, str(r404.json()))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+asyncio.run(t4())
 print(f"\n逻辑验证: {passed} 通过")

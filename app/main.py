@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from .api import adjust as adjust_api
 from .api import generate as generate_api
 from .api import resume as resume_api
 from .api import search as search_api
@@ -60,6 +61,7 @@ app.include_router(upload_api.router)
 app.include_router(skills_api.router)
 app.include_router(search_api.router)
 app.include_router(generate_api.router)
+app.include_router(adjust_api.router)
 
 
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")

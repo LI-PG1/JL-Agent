@@ -27,6 +27,8 @@ class GenContext:
     skill_extend_enabled: bool = False
     industry_rules: dict = field(default_factory=dict)
     blocks: dict = field(default_factory=dict)   # 各块输出
+    html: str = ""                               # P5 装配产出（building）
+    assembly_config: dict = field(default_factory=dict)
     # 运行时依赖（由 runner 注入）
     provider: Optional[Any] = None
     rules: Optional[Any] = None

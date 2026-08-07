@@ -16,6 +16,7 @@ from ..core.errors import AppError, E_BLOCK_FAIL, E_SEARCH
 from ..core.providers import LLMProvider
 from ..schemas import BLOCK_WEIGHTS, Job, Resume
 from .analysis import JDAnalyzer
+from .assembly import Assembler
 from .blocks import BLOCK_GENERATORS, LAYER1, LAYER2
 from .blocks.base import GenContext
 from .budget import BudgetTracker
@@ -286,6 +287,16 @@ class GenerationRunner:
         gen["stages"] = list(STAGES)
         gen["calibrationRef"] = getattr(self.budget, "path", None).name if getattr(self.budget, "path", None) else None
         resume["generation"] = gen
+
+        # 模板装配（§6 building 步骤 1）：占位符替换/空区块删除/照片位/密度/水印 → html + config
+        # 模板缺失为致命错误（E_TEMPLATE → failed，§5.6）
+        assembler = Assembler(self.config.paths.templates_dir, self.storage)
+        ctx.html, ctx.assembly_config = assembler.render(
+            resume, ctx.blocks,
+            density=resume.get("density", "normal"),
+            watermark_mode=gen.get("watermarkMode", "practice"),
+        )
+
         resume["updatedAt"] = self.now()
         self.storage.save_resume(resume)
 
@@ -305,13 +316,13 @@ class GenerationRunner:
         self.storage.save_task(task)
         await self._push(ctx.task_id, "task.done", {
             "taskId": ctx.task_id, "resumeId": ctx.resume_id,
-            "config": {
+            "config": ctx.assembly_config or {
                 "pageOption": ctx.page_option,
                 "density": ctx.resume.get("density", "normal"),
                 "direction": ctx.factsheet.get("direction", ""),
                 "contentPlan": ctx.resume.get("contentPlan", {}),
             },
-            "html": "",  # P5 模板装配注入
+            "html": ctx.html,  # P5 模板装配产出（前端可直接渲染）
         })
 
     async def _fail(self, task_id: str, exc: AppError) -> None:

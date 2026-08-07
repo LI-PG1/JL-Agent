@@ -19,6 +19,7 @@ class BudgetTracker:
     def __init__(self, data_dir: str):
         self.path = Path(data_dir) / "calibration.json"
         self.rows: List[dict] = []
+        self._last: dict = {}          # {block: {detailLevel, estimatedLines}}（P5 多块校准）
         if self.path.exists():
             try:
                 self.rows = json.loads(self.path.read_text(encoding="utf-8"))
@@ -47,15 +48,20 @@ class BudgetTracker:
         """记录本次自估（不落校准表，actual 未知）；返回该块总估计行数。"""
         entries = self.collect_estimated(block, output)
         total = sum(e["estimatedLines"] for e in entries)
-        self._last = {"block": block, "detailLevel": detail_level, "estimatedLines": total}
+        self._last[block] = {"detailLevel": detail_level, "estimatedLines": total}
         return total
 
     # ------------------------------------------------------------ 校准（P5 实测）
 
     def record_actual(self, block: str, actual_lines: int, detail_level: str = "标准",
-                      page_width: int = 794) -> float:
-        """P5 适配闭环实测后追加校准行，返回累计校正系数。"""
-        est = getattr(self, "_last", {}).get("estimatedLines", 0) or 0
+                      page_width: int = 794, estimated_lines: Optional[int] = None) -> float:
+        """P5 适配闭环实测后追加校准行，返回累计校正系数。
+
+        estimated_lines 由前端从 task.done config.blocks 基线回传（§5.3）；
+        缺省时回退本次运行记录（record_estimated 写入的 _last）。
+        """
+        est = estimated_lines if estimated_lines is not None \
+            else ((self._last.get(block) or {}).get("estimatedLines", 0) or 0)
         ratio = round(actual_lines / est, 3) if est else 0.0
         self.rows.append({
             "blockType": block, "detailLevel": detail_level, "pageWidth": page_width,
