@@ -27,6 +27,42 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 PROVIDER_FIELDS = ("id", "name", "baseUrl", "model", "apiKey", "capabilities", "enabled", "order")
 
+# 可集成插件注册表（外部 CLI 工具；启用状态存入 settings.json，接入方案见项目文档）
+PLUGIN_REGISTRY = [
+    {
+        "id": "zhihu-cli",
+        "name": "zhihu-cli",
+        "category": "内容获取",
+        "source": "https://github.com/dawnswwwww/zhihu-cli",
+        "description": "知乎内容获取：按关键词搜索高赞回答与资料。npm 一键安装、免 Cookie（基于知乎开放平台 API）。",
+    },
+    {
+        "id": "ats-checker",
+        "name": "ats-checker",
+        "category": "ATS 预检",
+        "source": "https://github.com/pranavraut033/ats-checker",
+        "description": "投递前简历 ATS 兼容性评分（0-100），零依赖 npm 工具。",
+    },
+    {
+        "id": "markdown-cv",
+        "name": "markdown-cv",
+        "category": "模板输出",
+        "source": "https://github.com/elipapa/markdown-cv",
+        "description": "将简历输出为 Markdown 格式，便于网页/文档场景复用。",
+    },
+]
+
+
+def _plugins_view(s: dict) -> list[dict]:
+    """插件注册表 + 启用状态（来自 settings.json pluginsEnabled）。"""
+    enabled = s.get("pluginsEnabled") or {}
+    out = []
+    for p in PLUGIN_REGISTRY:
+        row = dict(p)
+        row["enabled"] = bool(enabled.get(p["id"], False))
+        out.append(row)
+    return out
+
 
 def _providers_view(s: dict) -> list[dict]:
     """脱敏视图：apiKey 只保留掩码，供前端展示。"""
@@ -83,6 +119,10 @@ class TestBody(CamelModel):
     api_key: str = Field(min_length=1, max_length=512)
 
 
+class PluginBody(CamelModel):
+    enabled: bool
+
+
 @router.get("", response_model=dict)
 def get_settings(request: Request):
     s = request.app.state.storage.load_settings()
@@ -109,6 +149,7 @@ def get_settings(request: Request):
         "watermarkDefault": s.get("watermarkDefault", "formal"),
         "providers": _providers_view(s),
         "activeProviderId": s.get("activeProviderId", ""),
+        "plugins": _plugins_view(s),
     }}
 
 
@@ -242,3 +283,16 @@ async def test_provider(body: TestBody, request: Request):
         raise
     except Exception as exc:  # noqa: BLE001
         return {"code": 0, "message": "ok", "data": {"ok": False, "error": str(exc)}}
+
+
+@router.put("/plugins/{plugin_id}", response_model=dict)
+def toggle_plugin(plugin_id: str, body: PluginBody, request: Request):
+    """切换可集成插件启用状态（外部 CLI 工具待接入，状态先落盘供后续接入使用）。"""
+    storage = request.app.state.storage
+    s = storage.load_settings()
+    if not any(p["id"] == plugin_id for p in PLUGIN_REGISTRY):
+        raise AppError(40001, f"插件不存在: {plugin_id}", {"pluginId": plugin_id})
+    enabled = s.setdefault("pluginsEnabled", {})
+    enabled[plugin_id] = body.enabled
+    storage.save_settings(s)
+    return {"code": 0, "message": "ok", "data": {"plugins": _plugins_view(s)}}

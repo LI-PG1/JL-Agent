@@ -480,6 +480,7 @@
       if (j.code !== 0) throw new Error(errMsg(j));
       var d = j.data;
       renderProviders(d.providers || [], d.activeProviderId);
+      renderPlugins(d.plugins || []);
       $id("s-deep").checked = d.deepSearchDefault !== false;
       $id("s-watermark-formal").checked = d.watermarkDefault !== "practice";
       // 同步生成条默认值
@@ -656,6 +657,64 @@
       $id("defaults-msg").textContent = "已保存默认值 " + new Date().toLocaleTimeString();
     }).catch(function (e) {
       $id("defaults-msg").textContent = "保存失败：" + e.message;
+    });
+  }
+
+  // 可集成插件（外部 CLI 工具）：注册表 + 启用开关（即时保存）
+  function renderPlugins(list) {
+    var box = $id("plugin-list");
+    box.innerHTML = "";
+    state.plugins = list || [];
+    if (!state.plugins.length) {
+      box.innerHTML = '<div class="muted small">暂无可用插件。</div>';
+      return;
+    }
+    state.plugins.forEach(function (p) {
+      var item = document.createElement("div");
+      item.className = "plugin-item" + (p.enabled ? " on" : "");
+      var main = document.createElement("div");
+      main.className = "plugin-main";
+      var st = p.enabled
+        ? '<span class="tag ok-tag">已启用（待接入）</span>'
+        : '<span class="tag optional">待接入</span>';
+      main.innerHTML = "<b>" + esc(p.name) + "</b>" +
+        " <span class=\"tag cat-tag\">" + esc(p.category) + "</span> " + st;
+      var sub = document.createElement("div");
+      sub.className = "plugin-sub";
+      sub.textContent = p.description + " ";
+      var link = document.createElement("a");
+      link.href = p.source;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "GitHub";
+      sub.appendChild(link);
+      var ops = document.createElement("label");
+      ops.className = "chk plugin-toggle";
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = p.enabled;
+      cb.addEventListener("change", function () { togglePlugin(p.id, cb.checked, cb); });
+      ops.appendChild(cb);
+      ops.appendChild(document.createTextNode("启用"));
+      item.appendChild(main);
+      item.appendChild(sub);
+      item.appendChild(ops);
+      box.appendChild(item);
+    });
+  }
+
+  function togglePlugin(id, enabled, cb) {
+    fetch("/api/settings/plugins/" + id, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: enabled }),
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j.code !== 0) { cb.checked = !enabled; throw new Error(errMsg(j)); }
+      renderPlugins(j.data.plugins);
+      $id("plugin-msg").textContent = "已更新插件状态 " + new Date().toLocaleTimeString();
+    }).catch(function (e) {
+      cb.checked = !enabled;
+      Adapt.showBanner("插件状态更新失败：" + e.message, true);
     });
   }
 

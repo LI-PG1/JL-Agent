@@ -673,6 +673,25 @@ async def t6():
             ok("删除 provider 生效", r.status_code == 200
                and all(p.get("id") != pid for p in d["providers"]), str(d["providers"]))
 
+            # 可集成插件：注册表回读 → 启用 → 回读 → 非法 id 拦截
+            r = client.get("/api/settings")
+            d = r.json()["data"]
+            pl = d.get("plugins") or []
+            ok("插件注册表回读（含 zhihu-cli/ats-checker/markdown-cv）",
+               len(pl) == 3 and all(p.get("enabled") is False for p in pl) and
+               {p["id"] for p in pl} == {"zhihu-cli", "ats-checker", "markdown-cv"}, str(pl))
+            r = client.put("/api/settings/plugins/zhihu-cli", json={"enabled": True})
+            d = r.json()["data"]
+            on = next((p for p in d["plugins"] if p["id"] == "zhihu-cli"), {})
+            ok("启用插件即时保存", r.status_code == 200 and on.get("enabled") is True, str(d))
+            r = client.get("/api/settings")
+            d = r.json()["data"]
+            on = next((p for p in d["plugins"] if p["id"] == "zhihu-cli"), {})
+            off = next((p for p in d["plugins"] if p["id"] == "ats-checker"), {})
+            ok("插件状态持久化回读", on.get("enabled") is True and off.get("enabled") is False, str(d["plugins"]))
+            r = client.put("/api/settings/plugins/not-exist", json={"enabled": True})
+            ok("未知插件拦截", r.status_code == 400 and r.json()["code"] == 40001, str(r.json()))
+
             # 技能分类扩容：新枚举值可通过 Resume 校验并保存
             r = client.post("/api/resume", json={
                 "basicInfo": {"name": "李四", "age": 25, "email": "l@b.com", "phone": "13900000000"},

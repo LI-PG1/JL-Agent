@@ -106,6 +106,7 @@ class Storage:
         "watermarkDefault": "formal",
         "providers": [],
         "activeProviderId": "",
+        "pluginsEnabled": {},
     }
 
     def load_settings(self) -> dict:
