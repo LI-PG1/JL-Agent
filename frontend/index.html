@@ -15,6 +15,7 @@
     </div>
     <div class="top-right">
       <span id="health-status">检测中…</span>
+      <button id="btn-settings" class="btn-top" type="button">⚙ 高级设置</button>
     </div>
   </header>
 
@@ -31,7 +32,7 @@
         <div class="flow-step"><b><span class="fs-no">1</span>粘贴钥匙</b>填配置名称 / Base URL / API Key</div>
         <div class="flow-step"><b><span class="fs-no">2</span>填写配置</b>模型名 / 服务地址</div>
         <div class="flow-step"><b><span class="fs-no">3</span>保存验证</b>自检通过即生效</div>
-        <div class="flow-step optional"><b><span class="fs-no alt">4</span>高级设置（可选）</b>多模型管理 / 搜索 Key</div>
+        <div class="flow-step optional"><b><span class="fs-no alt">4</span>高级设置（可选）</b>多模型管理 / 搜索 Key → 右上「⚙ 高级设置」</div>
       </div>
 
       <!-- 快速配置组（当前 provider） -->
@@ -46,53 +47,6 @@
         <button id="btn-save-settings" class="btn primary" type="button">保存并自检</button>
         <span id="settings-hint" class="muted small"></span>
       </div>
-
-      <!-- 高级设置（MS-Agent 风格抽屉式展开） -->
-      <details class="adv" id="adv-settings">
-        <summary>⚙ 高级设置（多模型配置管理 / 搜索 / 插件默认值）</summary>
-        <div id="prov-list" class="prov-list"></div>
-        <h4>新增配置</h4>
-        <div class="hint-line">列表顺序即调用优先级，激活项排最前。</div>
-        <div class="grid">
-          <label>配置名称<input id="p-name" maxlength="64" placeholder="如 my-key-2"></label>
-          <label>模型名<input id="p-model" maxlength="128" placeholder="如 Qwen/Qwen2.5-72B-Instruct"></label>
-          <label class="wide">Base URL<input id="p-baseurl" maxlength="256" placeholder="https://api.xxx.com/v1"></label>
-          <label class="wide">API Key<input id="p-apikey" type="password" maxlength="512" placeholder="sk-..."></label>
-        </div>
-        <div class="actions">
-          <button id="btn-add-provider" class="btn" type="button">添加配置</button>
-          <button id="btn-test-provider" class="btn ghost" type="button">配置自检</button>
-          <span id="prov-msg" class="muted small"></span>
-        </div>
-
-        <h4>联网搜索（可选增强）</h4>
-        <div class="hint-line">配置搜索服务 Key 后，生成前会自动搜索权威来源并注入上下文，减少「待联网核实」标注。全部可选：不配置时按协议标注，不影响生成。</div>
-        <div class="grid">
-          <label class="wide">Tavily API Key<input id="s-searchkey" type="password" maxlength="512"
-                 placeholder="tvly-...（留空保存 = 关闭联网搜索）"></label>
-        </div>
-        <div class="actions">
-          <button id="btn-save-search" class="btn" type="button">保存搜索 Key</button>
-          <span id="search-msg" class="muted small"></span>
-        </div>
-
-        <h4>插件默认值</h4>
-        <div class="grid">
-          <label class="chk"><input id="s-deep" type="checkbox"> 默认开启深度搜索</label>
-          <label class="chk"><input id="s-watermark-formal" type="checkbox" checked> 默认无水印（正式版）</label>
-        </div>
-        <div class="actions">
-          <button id="btn-save-defaults" class="btn" type="button">保存默认值</button>
-          <span id="defaults-msg" class="muted small"></span>
-        </div>
-
-        <h4>可集成插件（外部 CLI 工具）</h4>
-        <div class="hint-line">外部工具当前为「待接入」状态：启用后记录偏好，接入方案见项目文档。点击 GitHub 链接查看工具说明。</div>
-        <div id="plugin-list"></div>
-        <div class="actions">
-          <span id="plugin-msg" class="muted small"></span>
-        </div>
-      </details>
     </section>
 
     <!-- ================= ② 简历信息 ================= -->
@@ -220,6 +174,60 @@
       <div id="edit-tip" class="edit-tip hidden">编辑提示：点击预览正文中的文字即可编辑；已编辑条目会带「已锁定」标识，AI 生成不会覆盖。</div>
     </section>
   </main>
+</div>
+
+<!-- 高级设置抽屉（顶部常驻按钮打开，仿 MS-Agent） -->
+<div class="mask" id="settings-mask"></div>
+<div class="drawer" id="settings-drawer">
+  <div class="drawer-head">
+    <h3>⚙ 高级设置（多模型配置管理 / 搜索 / 插件）</h3>
+    <button class="drawer-close" id="btn-close-settings" type="button">×</button>
+  </div>
+  <div class="drawer-body">
+    <div id="prov-list" class="prov-list"></div>
+
+    <h4>新增配置</h4>
+    <div class="hint-line">列表顺序即调用优先级，激活项排最前。</div>
+    <div class="grid">
+      <label>配置名称<input id="p-name" maxlength="64" placeholder="如 my-key-2"></label>
+      <label>模型名<input id="p-model" maxlength="128" placeholder="如 Qwen/Qwen2.5-72B-Instruct"></label>
+      <label class="wide">Base URL<input id="p-baseurl" maxlength="256" placeholder="https://api.xxx.com/v1"></label>
+      <label class="wide">API Key<input id="p-apikey" type="password" maxlength="512" placeholder="sk-..."></label>
+    </div>
+    <div class="actions">
+      <button id="btn-add-provider" class="btn" type="button">添加配置</button>
+      <button id="btn-test-provider" class="btn ghost" type="button">配置自检</button>
+      <span id="prov-msg" class="muted small"></span>
+    </div>
+
+    <h4>联网搜索（可选增强）</h4>
+    <div class="hint-line">配置搜索服务 Key 后，生成前会自动搜索权威来源并注入上下文，减少「待联网核实」标注。全部可选：不配置时按协议标注，不影响生成。</div>
+    <div class="grid">
+      <label class="wide">Tavily API Key<input id="s-searchkey" type="password" maxlength="512"
+             placeholder="tvly-...（留空保存 = 关闭联网搜索）"></label>
+    </div>
+    <div class="actions">
+      <button id="btn-save-search" class="btn" type="button">保存搜索 Key</button>
+      <span id="search-msg" class="muted small"></span>
+    </div>
+
+    <h4>插件默认值</h4>
+    <div class="grid">
+      <label class="chk"><input id="s-deep" type="checkbox"> 默认开启深度搜索</label>
+      <label class="chk"><input id="s-watermark-formal" type="checkbox" checked> 默认无水印（正式版）</label>
+    </div>
+    <div class="actions">
+      <button id="btn-save-defaults" class="btn" type="button">保存默认值</button>
+      <span id="defaults-msg" class="muted small"></span>
+    </div>
+
+    <h4>可集成插件（外部 CLI 工具）</h4>
+    <div class="hint-line">外部工具当前为「待接入」状态：启用后记录偏好，接入方案见项目文档。点击 GitHub 链接查看工具说明。</div>
+    <div id="plugin-list"></div>
+    <div class="actions">
+      <span id="plugin-msg" class="muted small"></span>
+    </div>
+  </div>
 </div>
 
 <!-- 条目编辑弹窗（§5.5） -->

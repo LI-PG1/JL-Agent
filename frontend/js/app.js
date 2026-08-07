@@ -598,7 +598,7 @@
     $id("s-apikey").value = "";
     $id("btn-save-settings").textContent = "保存修改";
     $id("settings-hint").textContent = "正在编辑：" + p.name + "（Key 留空 = 保留原 Key）";
-    $id("adv-settings").removeAttribute("open");
+    closeSettings();
     $id("btn-save-settings").scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
@@ -688,7 +688,7 @@
       var cb = document.createElement("input");
       cb.type = "checkbox";
       cb.checked = p.enabled;
-      cb.addEventListener("change", function () { togglePlugin(p.id, cb.checked, cb); });
+      cb.addEventListener("change", function () { togglePlugin(p.id, cb.checked); });
       ops.appendChild(cb);
       ops.appendChild(document.createTextNode("启用"));
       item.appendChild(main);
@@ -698,19 +698,31 @@
     });
   }
 
-  function togglePlugin(id, enabled, cb) {
+  function togglePlugin(id, enabled) {
     fetch("/api/settings/plugins/" + id, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ enabled: enabled }),
     }).then(function (r) { return r.json(); }).then(function (j) {
-      if (j.code !== 0) { cb.checked = !enabled; throw new Error(errMsg(j)); }
+      if (j.code !== 0) throw new Error(errMsg(j));
       renderPlugins(j.data.plugins);
       $id("plugin-msg").textContent = "已更新插件状态 " + new Date().toLocaleTimeString();
     }).catch(function (e) {
-      cb.checked = !enabled;
-      Adapt.showBanner("插件状态更新失败：" + e.message, true);
+      // 失败：不盲目取反回滚，改从服务端拉取真实状态同步，并明确提示
+      loadSettings().catch(function () {});
+      Adapt.showBanner("插件状态保存失败，已恢复原状态：" + e.message + "（请确认后端服务已启动）", true);
     });
+  }
+
+  /* ---------------- 高级设置抽屉（顶部常驻按钮，仿 MS-Agent） ---------------- */
+  function openSettings() {
+    $id("settings-drawer").classList.add("open");
+    $id("settings-mask").style.display = "block";
+    loadSettings();   // 打开时刷新配置/插件状态
+  }
+  function closeSettings() {
+    $id("settings-drawer").classList.remove("open");
+    $id("settings-mask").style.display = "none";
   }
 
   /* ---------------- 生成 + SSE ---------------- */
@@ -827,6 +839,9 @@
     $id("btn-test-provider").addEventListener("click", testQuickProvider);
     $id("btn-save-search").addEventListener("click", saveSearch);
     $id("btn-save-defaults").addEventListener("click", saveDefaults);
+    $id("btn-settings").addEventListener("click", openSettings);
+    $id("btn-close-settings").addEventListener("click", closeSettings);
+    $id("settings-mask").addEventListener("click", closeSettings);
     $id("btn-generate").addEventListener("click", startGenerate);
     $id("btn-cancel").addEventListener("click", cancelTask);
     document.querySelectorAll("[data-add]").forEach(function (btn) {

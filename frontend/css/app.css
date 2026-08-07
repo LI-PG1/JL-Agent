@@ -58,6 +58,13 @@ code {
   padding: 2px 10px; border-radius: var(--radius-badge);
 }
 #health-status { font-size: 12px; }
+.top-right { display: flex; align-items: center; gap: 10px; }
+.btn-top {
+  border: 1px solid rgba(255, 255, 255, .28); background: rgba(255, 255, 255, .08);
+  color: var(--topbar-fg); padding: 5px 13px; border-radius: var(--radius-input);
+  font-size: 12.5px; cursor: pointer; transition: background .15s;
+}
+.btn-top:hover { background: rgba(255, 255, 255, .18); }
 
 /* ---------------- 布局（纵向：设置→表单→生成→我的简历→预览） ---------------- */
 .layout {
@@ -99,14 +106,32 @@ code {
 }
 .fs-no.alt { background: var(--muted); }
 
-/* 高级设置（details 展开） */
-.adv { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 10px; }
-.adv summary {
-  cursor: pointer; font-size: 13px; font-weight: 600;
-  color: var(--accent); padding: 6px 0; user-select: none;
+/* 高级设置抽屉（顶部常驻按钮打开，仿 MS-Agent） */
+.mask {
+  position: fixed; inset: 0; background: rgba(17, 24, 39, .45);
+  z-index: 90; display: none;
 }
-.adv summary:hover { color: #1d4ed8; }
-.adv h4 { font-size: 13px; margin: 16px 0 8px; color: var(--ink-soft); }
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: 480px; max-width: 94vw;
+  background: var(--card); z-index: 91;
+  transform: translateX(105%); transition: transform .28s ease;
+  box-shadow: -8px 0 30px rgba(0, 0, 0, .2);
+  display: flex; flex-direction: column;
+}
+.drawer.open { transform: none; }
+.drawer-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 18px; background: var(--topbar); color: var(--topbar-fg);
+}
+.drawer-head h3 { margin: 0; font-size: 14.5px; }
+.drawer-close {
+  margin-left: auto; background: none; border: none;
+  color: #9ca3af; font-size: 22px; cursor: pointer; line-height: 1;
+}
+.drawer-close:hover { color: #fff; }
+.drawer-body { padding: 16px 18px; overflow-y: auto; flex: 1; }
+.drawer-body h4 { font-size: 13px; margin: 18px 0 8px; color: var(--ink-soft); }
+.drawer-body label.chk { padding-top: 0; }
 .hint-line {
   font-size: 11.5px; color: var(--ink-mute); line-height: 1.6;
   background: var(--accent-soft); border: 1px solid var(--line);
