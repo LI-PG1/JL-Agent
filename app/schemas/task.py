@@ -30,6 +30,7 @@ class Task(CamelModel):
     stage_total: int = 1
     progress: float = 0.0              # 0~1
     error: Optional[dict] = None       # {code, message}
+    events: list = Field(default_factory=list)  # SSE 事件持久化（断线重连可回放）
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 

@@ -194,13 +194,15 @@ else:
     check("提交关卡通过并创建任务", sc == 200 and bool(task_id), str(j))
     if task_id:
         r = httpx.get(f"{BASE}/api/task/{task_id}", timeout=10)
-        check("任务快照 pending", r.status_code == 200 and r.json()["data"]["state"] == "pending", str(r.json()))
+        state = r.json()["data"]["state"]
+        check("任务已启动（非终态）", r.status_code == 200 and state in ("pending", "analyzing", "generating"),
+              str(r.json()))
         r = httpx.post(f"{BASE}/api/task/{task_id}/cancel", timeout=10)
         check("取消任务", r.status_code == 200 and r.json()["data"]["canceled"] is True, str(r.json()))
         r = httpx.post(f"{BASE}/api/task/{task_id}/cancel", timeout=10)
         check("重复取消 → 40009", r.status_code == 400 and r.json()["code"] == 40009, str(r.json()))
         r = httpx.get(f"{BASE}/api/task/{task_id}/events", timeout=10)
-        check("SSE 返回取消事件", r.status_code == 200 and "task.canceled" in r.text, r.text[:120])
+        check("SSE 回放含 task.canceled", r.status_code == 200 and "task.canceled" in r.text, r.text[:120])
 
 print(f"\n结果: {ok} 通过, {fail} 失败")
 raise SystemExit(1 if fail else 0)

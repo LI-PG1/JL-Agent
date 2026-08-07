@@ -14,6 +14,7 @@ from .api import upload as upload_api
 from .config import load_config
 from .core.errors import AppError
 from .core.rules import RulesLoader
+from .engine.cache import GenCache
 from .search.api_search import ApiSearchClient
 from .storage import Storage
 
@@ -27,6 +28,7 @@ async def lifespan(app: FastAPI):
     app.state.rules = rules
     app.state.storage = Storage(cfg.paths.data_dir)
     app.state.search_client = ApiSearchClient(cfg)
+    app.state.gen_cache = GenCache(cfg.paths.data_dir)
     app.state.now = lambda: datetime.now().astimezone().isoformat(timespec="seconds")
     yield
 
