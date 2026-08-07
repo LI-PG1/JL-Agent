@@ -17,6 +17,7 @@ from .common import (
     SourceType,
     VersionType,
 )
+from .jobs import Job
 
 # ---------------------------------------------------------------- 实体
 
@@ -135,6 +136,7 @@ class Resume(CamelModel):
     summary: List[SummarySentence] = Field(default_factory=list)
     skill: List[Skill] = Field(default_factory=list)
     honor: List[Honor] = Field(default_factory=list)
+    jobs: List[Job] = Field(default_factory=list, description="目标岗位 JD（1~5 套，同一方向）")
 
     direction: Optional[str] = None
     page_option: PageOption = PageOption.one_page

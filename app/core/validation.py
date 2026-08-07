@@ -95,6 +95,10 @@ def check_resume(resume: Resume, limits) -> None:
     for p in resume.project:
         check_period(p.start_month, p.end_month, "项目经历")
 
+    # JD：数量上限（≥1 由生成关卡校验，CRUD 允许暂不填写）
+    if len(resume.jobs) > limits.jobs_max:
+        raise AppError(E_LIMIT, f"目标岗位最多 {limits.jobs_max} 套")
+
     # 技能：必填 ≥1
     if not resume.skill:
         raise AppError(E_PARAM, "技能特长至少填写 1 条")

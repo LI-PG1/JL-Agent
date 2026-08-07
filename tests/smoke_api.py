@@ -1,16 +1,24 @@
-"""API 冒烟/回归测试（P2 起）：CRUD + 校验错误 + 照片上传。
+"""API 冒烟/回归测试（P2~P3）：CRUD + 校验错误 + 照片上传 + JD 分析/搜索/提交关卡。
 
 运行：先启动服务（uvicorn app.main:app），再执行
     .venv\\Scripts\\python.exe tests\\smoke_api.py
+
+LLM 依赖用例：本机配置 DEEPSEEK_API_KEY（.env）时跑通「生成→任务→取消」全链路；
+未配置时验证优雅降级错误码（50002）。
 """
 import io
 import json
+import os
 import urllib.request
 
 import httpx
 from PIL import Image
 
+from dotenv import load_dotenv
+
 BASE = "http://127.0.0.1:8000"
+load_dotenv()  # 加载工程根 .env（与服务器同源，用于判断是否具备 LLM 链路）
+HAS_LLM = bool(os.getenv("DEEPSEEK_API_KEY"))
 ok = 0
 fail = 0
 
@@ -132,6 +140,67 @@ r = httpx.delete(f"{BASE}/api/resume/{rid}", timeout=10)
 check("DELETE 成功", r.status_code == 200 and r.json()["data"]["deleted"] is True)
 r = httpx.get(f"{BASE}/api/resume/{rid}", timeout=10)
 check("删除后 404（40008）", r.status_code == 400 and r.json()["code"] == 40008, str(r.json()))
+
+print("\n== 14. P3 搜索模式检测 ==")
+r = httpx.get(f"{BASE}/api/search/mode", timeout=10)
+j = r.json()
+d = j.get("data") or {}
+check("GET /api/search/mode 结构", j["code"] == 0 and isinstance(d.get("apiReady"), bool)
+      and d.get("deepAvailable") is False and isinstance(d.get("missing"), list), str(j))
+
+print("== 15. P3 技能校验参数（空列表 → 422） ==")
+sc, j = post("/api/skills/validate", {"skills": [], "jobs": []})
+check("skills/jobs 为空 → 422", sc == 422, str(j))
+
+print("== 16. P3 生成关卡：无 JD → 40001 ==")
+sc, j = post("/api/generate", {"resumeId": "res_not_exist", "pageOption": "one-page"})
+check("简历不存在 → 40008", sc == 400 and j["code"] == 40008, str(j))
+
+# 新建带 JD 的简历用于关卡测试
+jobs1 = [{"title": "大模型应用开发实习生", "jdText": "负责 LLM Agent 与 RAG 系统开发，熟悉 Python、PyTorch、Docker"}]
+r3 = post("/api/resume", build_resume(jobs=jobs1))
+rid3 = r3[1]["data"]["resumeId"]
+check("创建带 JD 的简历", r3[0] == 200 and bool(rid3), str(r3[1]))
+
+rid_no_job = post("/api/resume", build_resume())[1]["data"]["resumeId"]
+sc, j = post("/api/generate", {"resumeId": rid_no_job, "pageOption": "one-page"})
+check("有简历无 JD → 40001", sc == 400 and j["code"] == 40001, str(j))
+
+print("== 17. P3 JD 数量上限（6 套 → 40011） ==")
+six_jobs = [{"title": f"岗位{i}", "jdText": "文本内容"} for i in range(6)]
+sc, j = post("/api/resume", build_resume(jobs=six_jobs))
+check("JD 超 5 套 → 40011", sc == 400 and j["code"] == 40011, str(j))
+
+print("== 18. P3 任务不存在 → 40008 ==")
+r = httpx.get(f"{BASE}/api/task/no_such_task", timeout=10)
+check("GET 任务不存在 → 40008", r.status_code == 400 and r.json()["code"] == 40008)
+r = httpx.post(f"{BASE}/api/task/no_such_task/cancel", timeout=10)
+check("取消不存在任务 → 40008", r.status_code == 400 and r.json()["code"] == 40008)
+r = httpx.get(f"{BASE}/api/task/no_such_task/events", timeout=10)
+check("SSE 任务不存在 → 40008", r.status_code == 400 and r.json()["code"] == 40008)
+
+if not HAS_LLM:
+    print("== 19. P3 无 LLM Key：技能校验/生成关卡优雅降级 ==")
+    sc, j = post("/api/skills/validate", {"skills": [{"category": "专业技能", "name": "Python"}], "jobs": jobs1})
+    check("技能校验 → 50002（LLM 未配置）", sc == 500 and j["code"] == 50002, str(j))
+    sc, j = post("/api/generate", {"resumeId": rid3, "pageOption": "one-page"})
+    check("生成关卡 → 50002（JD 分析失败）", sc == 500 and j["code"] == 50002, str(j))
+else:
+    print("== 19. P3 LLM 链路：技能校验三档 + 生成→任务→取消 ==")
+    sc, j = post("/api/skills/validate", {"skills": [{"category": "专业技能", "name": "Python"}], "jobs": jobs1})
+    check("技能校验通过（pass）", sc == 200 and j["code"] == 0 and j["data"]["verdict"] == "pass", str(j))
+    sc, j = post("/api/generate", {"resumeId": rid3, "pageOption": "one-page"})
+    task_id = j.get("data", {}).get("taskId") if sc == 200 else None
+    check("提交关卡通过并创建任务", sc == 200 and bool(task_id), str(j))
+    if task_id:
+        r = httpx.get(f"{BASE}/api/task/{task_id}", timeout=10)
+        check("任务快照 pending", r.status_code == 200 and r.json()["data"]["state"] == "pending", str(r.json()))
+        r = httpx.post(f"{BASE}/api/task/{task_id}/cancel", timeout=10)
+        check("取消任务", r.status_code == 200 and r.json()["data"]["canceled"] is True, str(r.json()))
+        r = httpx.post(f"{BASE}/api/task/{task_id}/cancel", timeout=10)
+        check("重复取消 → 40009", r.status_code == 400 and r.json()["code"] == 40009, str(r.json()))
+        r = httpx.get(f"{BASE}/api/task/{task_id}/events", timeout=10)
+        check("SSE 返回取消事件", r.status_code == 200 and "task.canceled" in r.text, r.text[:120])
 
 print(f"\n结果: {ok} 通过, {fail} 失败")
 raise SystemExit(1 if fail else 0)

@@ -6,11 +6,15 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from .api import generate as generate_api
 from .api import resume as resume_api
+from .api import search as search_api
+from .api import skills as skills_api
 from .api import upload as upload_api
 from .config import load_config
 from .core.errors import AppError
 from .core.rules import RulesLoader
+from .search.api_search import ApiSearchClient
 from .storage import Storage
 
 
@@ -22,6 +26,7 @@ async def lifespan(app: FastAPI):
     app.state.config = cfg
     app.state.rules = rules
     app.state.storage = Storage(cfg.paths.data_dir)
+    app.state.search_client = ApiSearchClient(cfg)
     app.state.now = lambda: datetime.now().astimezone().isoformat(timespec="seconds")
     yield
 
@@ -50,6 +55,9 @@ def health():
 
 app.include_router(resume_api.router)
 app.include_router(upload_api.router)
+app.include_router(skills_api.router)
+app.include_router(search_api.router)
+app.include_router(generate_api.router)
 
 
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")

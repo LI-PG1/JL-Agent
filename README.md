@@ -107,6 +107,29 @@ JL-Agent/
 - 工程契约（数据契约 / API 契约 / 引擎设计 / 验收清单）：[docs/contract.md](docs/contract.md)
 - 健康检查：`GET /api/health`（返回规则版本列表）
 
+### 主要接口一览
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/resume` | 创建/整存简历（无 id 则新建） |
+| GET/PUT/DELETE | `/api/resume/{id}` | 简历详情 / 更新 / 删除 |
+| POST | `/api/upload/photo` | 照片上传（JPG/PNG、200~4000px、≤5MB） |
+| POST | `/api/skills/validate` | 技能相关性三档判定（pass/weak/block，关键词兜底） |
+| POST | `/api/skills/extend` | 基于 JD 推荐补充技能 |
+| GET | `/api/search/mode` | 搜索能力检测（apiReady/deepAvailable/missing） |
+| POST | `/api/generate` | 提交关卡（JD 分析 + 技能相关性 + 主题一致性 + 数量约束）→ 创建任务 |
+| GET | `/api/task/{id}` | 任务快照（state/progress/stage） |
+| POST | `/api/task/{id}/cancel` | 取消任务 |
+| GET | `/api/task/{id}/events` | SSE 事件流 |
+
+### 测试
+
+```powershell
+# 启动服务后运行冒烟/回归测试
+.venv\Scripts\python.exe tests\smoke_api.py      # API 冒烟（无 LLM Key 时验证降级错误码）
+.venv\Scripts\python.exe tests\logic_check.py    # 核心逻辑回归（判定边界/容错，无 LLM 依赖）
+```
+
 ## License
 
 内部使用 / 待定（详见仓库）。

@@ -1,5 +1,6 @@
 """schemas 包：数据契约模型（契约 §3）统一出口。"""
 from .common import (
+    CamelModel,
     Criticality,
     Degree,
     Density,
@@ -30,7 +31,7 @@ from .resume import (
 from .task import BLOCK_WEIGHTS, BlockProgress, SSEEvent, Task, TaskState
 
 __all__ = [
-    "BasicInfo", "ContentPlan", "Criticality", "Degree", "Density", "DetailLevel",
+    "BasicInfo", "CamelModel", "ContentPlan", "Criticality", "Degree", "Density", "DetailLevel",
     "Direction", "Education", "Envelope", "Factsheet", "GenerationInfo", "Honor",
     "IdentityType", "Internship", "Job", "PageOption", "Photo", "Project", "Resume",
     "Skill", "SkillCategory", "SkillExtend", "SkillLevel", "SourceType",
