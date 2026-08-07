@@ -107,6 +107,7 @@ class Storage:
         "providers": [],
         "activeProviderId": "",
         "pluginsEnabled": {},
+        "pluginState": {},    # {plugin_id: {configured, installStatus, installMsg, config, features{}}}
     }
 
     def load_settings(self) -> dict:

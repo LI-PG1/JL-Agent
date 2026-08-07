@@ -655,7 +655,7 @@
     });
   }
 
-  // 可集成插件（外部 CLI 工具）：注册表 + 启用开关（即时保存）
+  // 可集成插件（外部 CLI 工具）：双层启动 —— 第一层「一键配置」+ 第二层「手动勾选」
   function renderPlugins(list) {
     var box = $id("plugin-list");
     box.innerHTML = "";
@@ -669,9 +669,12 @@
       item.className = "plugin-item" + (p.enabled ? " on" : "");
       var main = document.createElement("div");
       main.className = "plugin-main";
-      var st = p.enabled
-        ? '<span class="tag ok-tag">已启用（待接入）</span>'
-        : '<span class="tag optional">待接入</span>';
+      var st = p.configured
+        ? '<span class="tag ok-tag">已配置</span>'
+        : (p.installStatus === "failed"
+            ? '<span class="tag err-tag">配置失败</span>'
+            : '<span class="tag optional">待接入</span>');
+      if (p.enabled && p.configured) st += '<span class="tag on-tag">已启用</span>';
       main.innerHTML = "<b>" + esc(p.name) + "</b>" +
         " <span class=\"tag cat-tag\">" + esc(p.category) + "</span> " + st;
       var sub = document.createElement("div");
@@ -683,18 +686,90 @@
       link.rel = "noopener";
       link.textContent = "GitHub";
       sub.appendChild(link);
-      var ops = document.createElement("label");
-      ops.className = "chk plugin-toggle";
+
+      // 操作区：第一层「一键配置」+ 第二层「启用」勾选
+      var ops = document.createElement("div");
+      ops.className = "plugin-ops";
+      var cfgBtn = document.createElement("button");
+      cfgBtn.type = "button";
+      cfgBtn.className = "btn small";
+      cfgBtn.textContent = p.configured ? "重新配置" : "⚙ 一键配置";
+      cfgBtn.addEventListener("click", function () { configurePlugin(p.id, cfgBtn); });
+      ops.appendChild(cfgBtn);
+      var toggle = document.createElement("label");
+      toggle.className = "chk plugin-toggle";
       var cb = document.createElement("input");
       cb.type = "checkbox";
       cb.checked = p.enabled;
+      cb.disabled = !p.configured;   // 未配置前禁用勾选（避免"假启用"）
       cb.addEventListener("change", function () { togglePlugin(p.id, cb.checked); });
-      ops.appendChild(cb);
-      ops.appendChild(document.createTextNode("启用"));
+      toggle.appendChild(cb);
+      toggle.appendChild(document.createTextNode("启用"));
+      ops.appendChild(toggle);
       item.appendChild(main);
       item.appendChild(sub);
       item.appendChild(ops);
+
+      // 一键配置结果提示（installStatus / installMsg）
+      if (p.installMsg || p.installStatus === "failed") {
+        var hint = document.createElement("div");
+        hint.className = "plugin-hint" + (p.installStatus === "failed" ? " err" : "");
+        hint.textContent = p.installMsg || ("状态：" + p.installStatus);
+        item.appendChild(hint);
+      }
+
+      // 第二层精细化：功能模块勾选（configured 后展示）
+      if (p.configured && (p.featuresList || []).length) {
+        var feats = document.createElement("div");
+        feats.className = "plugin-feats";
+        feats.appendChild(document.createTextNode("功能模块："));
+        (p.featuresList || []).forEach(function (f) {
+          var fl = document.createElement("label");
+          fl.className = "chk feat";
+          var fc = document.createElement("input");
+          fc.type = "checkbox";
+          fc.checked = !!p.features[f.id];
+          fc.addEventListener("change", function () { toggleFeature(p.id, f.id, fc.checked); });
+          fl.appendChild(fc);
+          fl.appendChild(document.createTextNode(f.name));
+          feats.appendChild(fl);
+        });
+        item.appendChild(feats);
+      }
       box.appendChild(item);
+    });
+  }
+
+  // 第一层：一键配置（依赖检测 → 自动安装 → 默认参数 → 基础功能预激活）
+  function configurePlugin(id, btn) {
+    btn.disabled = true;
+    btn.textContent = "配置中…";
+    fetch("/api/settings/plugins/" + id + "/configure", { method: "POST" })
+      .then(function (r) { return r.json(); }).then(function (j) {
+        if (j.code !== 0) throw new Error(errMsg(j));
+        renderPlugins(j.data.plugins);
+        var me = (j.data.plugins || []).filter(function (x) { return x.id === id; })[0];
+        $id("plugin-msg").textContent = (me && me.configured
+          ? "一键配置完成 "
+          : "一键配置失败（详见插件卡片提示） ") + new Date().toLocaleTimeString();
+      }).catch(function (e) {
+        btn.disabled = false;
+        btn.textContent = "⚙ 一键配置";
+        Adapt.showBanner("一键配置失败：" + e.message, true);
+      });
+  }
+
+  // 第二层：功能模块精细控制
+  function toggleFeature(id, fid, enabled) {
+    fetch("/api/settings/plugins/" + id + "/features/" + fid, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: enabled }),
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j.code !== 0) throw new Error(errMsg(j));
+      renderPlugins(j.data.plugins);
+    }).catch(function (e) {
+      Adapt.showBanner("功能模块更新失败：" + e.message, true);
     });
   }
 

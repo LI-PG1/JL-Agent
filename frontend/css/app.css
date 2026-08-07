@@ -161,8 +161,15 @@ code {
 .plugin-main { font-size: 13px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .plugin-sub { font-size: 11.5px; color: var(--ink-mute); margin-top: 2px; word-break: break-all; }
 .plugin-sub a { color: var(--accent); }
-.plugin-toggle { margin-top: 8px; padding-top: 0; font-size: 12.5px; cursor: pointer; }
+.plugin-ops { display: flex; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+.plugin-toggle { padding-top: 0; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+.plugin-hint { margin-top: 6px; font-size: 11px; color: var(--ink-mute); word-break: break-all; }
+.plugin-hint.err { color: var(--err); }
+.plugin-feats { margin-top: 8px; font-size: 12px; color: var(--ink-soft); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.plugin-feats .feat { padding-top: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
 .tag.cat-tag { background: #e0e7ff; color: #4f46e5; }
+.tag.err-tag { background: #fee2e2; color: var(--err); }
+.tag.on-tag { background: var(--accent); color: #fff; }
 
 /* 配置状态条 */
 .key-status { font-size: 12px; font-weight: 600; }

@@ -692,6 +692,32 @@ async def t6():
             r = client.put("/api/settings/plugins/not-exist", json={"enabled": True})
             ok("未知插件拦截", r.status_code == 400 and r.json()["code"] == 40001, str(r.json()))
 
+            # 双层启动：第一层「一键配置」—— 仅检测不安装（auto_install=false），结构 + 状态联动
+            r = client.post("/api/settings/plugins/zhihu-cli/configure?auto_install=false")
+            d = r.json()["data"]
+            on = next((p for p in d["plugins"] if p["id"] == "zhihu-cli"), {})
+            ok("一键配置返回双层状态结构",
+               r.status_code == 200 and "configured" in on and "installStatus" in on
+               and on["installStatus"] in ("installed", "failed") and "features" in on
+               and "featuresList" in on and len(on["featuresList"]) == 3 and "config" in on, str(on))
+            ok("一键配置联动启用（配置成功即自动启用）",
+               (not on["configured"]) or on["enabled"] is True, str(on))
+            r = client.post("/api/settings/plugins/not-exist/configure")
+            ok("未知插件一键配置拦截", r.status_code == 400 and r.json()["code"] == 40001, str(r.json()))
+
+            # 第二层：功能模块精细控制（持久化 + 未知模块拦截）
+            r = client.put("/api/settings/plugins/zhihu-cli/features/hot", json={"enabled": True})
+            d = r.json()["data"]
+            on = next((p for p in d["plugins"] if p["id"] == "zhihu-cli"), {})
+            ok("功能模块切换即时保存", r.status_code == 200 and on["features"].get("hot") is True, str(on["features"]))
+            r = client.get("/api/settings")
+            d = r.json()["data"]
+            on = next((p for p in d["plugins"] if p["id"] == "zhihu-cli"), {})
+            ok("功能模块状态持久化回读",
+               on["features"].get("hot") is True and on["features"].get("search") is True, str(on["features"]))
+            r = client.put("/api/settings/plugins/zhihu-cli/features/not-exist", json={"enabled": True})
+            ok("未知功能模块拦截", r.status_code == 400 and r.json()["code"] == 40001, str(r.json()))
+
             # 技能分类扩容：新枚举值可通过 Resume 校验并保存
             r = client.post("/api/resume", json={
                 "basicInfo": {"name": "李四", "age": 25, "email": "l@b.com", "phone": "13900000000"},

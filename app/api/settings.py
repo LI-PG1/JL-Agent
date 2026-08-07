@@ -13,6 +13,9 @@
 - 自检：POST /api/settings/providers/test 用最小请求验证 Key / Base URL / 模型。
 """
 import os
+import shutil
+import subprocess
+from datetime import datetime
 from typing import Optional
 
 import httpx
@@ -27,7 +30,8 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 PROVIDER_FIELDS = ("id", "name", "baseUrl", "model", "apiKey", "capabilities", "enabled", "order")
 
-# 可集成插件注册表（外部 CLI 工具；启用状态存入 settings.json，接入方案见项目文档）
+# 可集成插件注册表（外部 CLI 工具；双层启动：一键配置 + 手动勾选）
+# runtime.manager/bin 用于依赖检测与自动安装；features 为功能模块（精细控制）；defaultConfig 为默认参数。
 PLUGIN_REGISTRY = [
     {
         "id": "zhihu-cli",
@@ -35,6 +39,14 @@ PLUGIN_REGISTRY = [
         "category": "内容获取",
         "source": "https://github.com/dawnswwwww/zhihu-cli",
         "description": "知乎内容获取：按关键词搜索高赞回答与资料。npm 一键安装、免 Cookie（基于知乎开放平台 API）。",
+        "runtime": {"manager": "npm", "bin": "zhihu-cli",
+                    "install": ["npm", "install", "-g", "zhihu-cli"]},
+        "features": [
+            {"id": "search", "name": "关键词搜索", "default": True},
+            {"id": "hot", "name": "热榜获取", "default": False},
+            {"id": "article", "name": "回答/文章下载", "default": False},
+        ],
+        "defaultConfig": {"language": "zh", "maxResults": 10, "format": "json"},
     },
     {
         "id": "ats-checker",
@@ -42,6 +54,13 @@ PLUGIN_REGISTRY = [
         "category": "ATS 预检",
         "source": "https://github.com/pranavraut033/ats-checker",
         "description": "投递前简历 ATS 兼容性评分（0-100），零依赖 npm 工具。",
+        "runtime": {"manager": "npm", "bin": "ats-checker",
+                    "install": ["npm", "install", "-g", "ats-checker"]},
+        "features": [
+            {"id": "score", "name": "ATS 评分", "default": True},
+            {"id": "report", "name": "详细报告", "default": False},
+        ],
+        "defaultConfig": {"format": "json"},
     },
     {
         "id": "markdown-cv",
@@ -49,19 +68,60 @@ PLUGIN_REGISTRY = [
         "category": "模板输出",
         "source": "https://github.com/elipapa/markdown-cv",
         "description": "将简历输出为 Markdown 格式，便于网页/文档场景复用。",
+        "runtime": {"manager": "git", "bin": "markdown-cv",
+                    "install": ["git", "clone", "--depth", "1",
+                                "https://github.com/elipapa/markdown-cv.git", "markdown-cv"]},
+        "features": [
+            {"id": "render", "name": "Markdown 渲染", "default": True},
+            {"id": "pdf", "name": "PDF 导出", "default": False},
+        ],
+        "defaultConfig": {"format": "markdown"},
     },
 ]
 
 
+def _plugin_or_404(plugin_id: str) -> dict:
+    for p in PLUGIN_REGISTRY:
+        if p["id"] == plugin_id:
+            return p
+    raise AppError(40001, f"插件不存在: {plugin_id}", {"pluginId": plugin_id})
+
+
 def _plugins_view(s: dict) -> list[dict]:
-    """插件注册表 + 启用状态（来自 settings.json pluginsEnabled）。"""
+    """插件注册表 + 双层启动状态（启用勾选 + 一键配置结果）。"""
     enabled = s.get("pluginsEnabled") or {}
+    states = s.get("pluginState") or {}
     out = []
     for p in PLUGIN_REGISTRY:
         row = dict(p)
         row["enabled"] = bool(enabled.get(p["id"], False))
+        st = states.get(p["id"]) or {}
+        row["configured"] = bool(st.get("configured", False))
+        row["installStatus"] = st.get("installStatus", "not-configured")
+        row["installMsg"] = st.get("installMsg", "")
+        row["features"] = st.get("features") or {
+            f["id"]: bool(f.get("default", False)) for f in p.get("features") or []}
+        row["featuresList"] = p.get("features") or []
+        row["config"] = st.get("config") or {}
         out.append(row)
     return out
+
+
+def _run_install(runtime: dict) -> tuple[str, str]:
+    """执行自动安装（列表参数、无 shell、超时 180s）；返回 (installStatus, msg)。"""
+    cmd = list(runtime.get("install") or [])
+    if not cmd:
+        return "failed", "未配置自动安装命令"
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        tail = (proc.stderr or proc.stdout or "").strip()[-300:]
+        if proc.returncode == 0 and shutil.which(runtime.get("bin", "")):
+            return "installed", "自动安装完成：" + " ".join(cmd)
+        return "failed", f"自动安装失败(exit={proc.returncode})：{tail or '详见终端'}"
+    except FileNotFoundError:
+        return "failed", "无法执行安装命令，请手动安装：" + " ".join(cmd)
+    except subprocess.TimeoutExpired:
+        return "failed", "安装超时（180s），请手动安装：" + " ".join(cmd)
 
 
 def _providers_view(s: dict) -> list[dict]:
@@ -287,12 +347,74 @@ async def test_provider(body: TestBody, request: Request):
 
 @router.put("/plugins/{plugin_id}", response_model=dict)
 def toggle_plugin(plugin_id: str, body: PluginBody, request: Request):
-    """切换可集成插件启用状态（外部 CLI 工具待接入，状态先落盘供后续接入使用）。"""
+    """第二层：手动勾选启用/停用插件（精细控制，不与一键配置冲突）。"""
     storage = request.app.state.storage
     s = storage.load_settings()
-    if not any(p["id"] == plugin_id for p in PLUGIN_REGISTRY):
-        raise AppError(40001, f"插件不存在: {plugin_id}", {"pluginId": plugin_id})
+    _plugin_or_404(plugin_id)
     enabled = s.setdefault("pluginsEnabled", {})
     enabled[plugin_id] = body.enabled
+    storage.save_settings(s)
+    return {"code": 0, "message": "ok", "data": {"plugins": _plugins_view(s)}}
+
+
+class FeatureBody(CamelModel):
+    enabled: bool
+
+
+@router.put("/plugins/{plugin_id}/features/{feature_id}", response_model=dict)
+def toggle_feature(plugin_id: str, feature_id: str, body: FeatureBody, request: Request):
+    """第二层：功能模块级精细控制（单模块启用/停用）。"""
+    storage = request.app.state.storage
+    p = _plugin_or_404(plugin_id)
+    if not any(f["id"] == feature_id for f in p.get("features") or []):
+        raise AppError(40001, f"功能模块不存在: {feature_id}", {"pluginId": plugin_id, "featureId": feature_id})
+    s = storage.load_settings()
+    state = s.setdefault("pluginState", {}).setdefault(plugin_id, {})
+    feats = state.setdefault("features", {})
+    feats[feature_id] = body.enabled
+    storage.save_settings(s)
+    return {"code": 0, "message": "ok", "data": {"plugins": _plugins_view(s)}}
+
+
+@router.post("/plugins/{plugin_id}/configure", response_model=dict)
+def configure_plugin(plugin_id: str, request: Request, auto_install: bool = True):
+    """第一层：一键配置——依赖环境检测 → 自动安装 → 默认参数写入 → 基础功能预激活。
+
+    幂等可重复执行；auto_install=False 仅检测不安装（供测试/预检）；安装失败时
+    configured=False 并返回手动安装指引，不影响手动勾选。
+    """
+    storage = request.app.state.storage
+    p = _plugin_or_404(plugin_id)
+    s = storage.load_settings()
+    state = s.setdefault("pluginState", {}).setdefault(plugin_id, {})
+    runtime = p.get("runtime") or {}
+    bin_name = runtime.get("bin", plugin_id)
+
+    # 1) 依赖环境检测
+    installed = shutil.which(bin_name) is not None
+    status, msg = ("installed", "运行环境已就绪") if installed else (None, "")
+
+    # 2) 自动安装（缺依赖、开启 auto_install 且存在包管理器时）
+    if not installed and auto_install:
+        manager = shutil.which(runtime.get("manager", ""))
+        if not manager:
+            status, msg = "failed", f"缺少包管理器 {runtime.get('manager', '')}，请先安装后重试"
+        else:
+            status, msg = _run_install(runtime)
+            installed = status == "installed"
+    elif not installed and not auto_install:
+        status, msg = "failed", f"未检测到可执行程序 {bin_name}（自动安装已跳过）"
+
+    # 3) 默认参数写入 + 基础功能预激活
+    state["config"] = dict(p.get("defaultConfig") or {})
+    state["features"] = {f["id"]: bool(f.get("default", False)) for f in p.get("features") or []}
+    state["installStatus"] = status
+    state["installMsg"] = msg
+    if installed:
+        state["configured"] = True
+        state["installTime"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+        s.setdefault("pluginsEnabled", {})[plugin_id] = True   # 联动：预激活 → 启用
+    else:
+        state["configured"] = False
     storage.save_settings(s)
     return {"code": 0, "message": "ok", "data": {"plugins": _plugins_view(s)}}
