@@ -14,13 +14,9 @@
   function monthToInput(v) { return (v || "").replace(".", "-"); }
   function inputToMonth(v) { return (v || "").replace("-", "."); }
   function list(v) { return String(v || "").split(/[,，、]/).map(function (s) { return s.trim(); }).filter(Boolean); }
-  // r16：时间约束 —— 开始 ≤ 用户使用当天；结束 ≤ 2028-12
-  var MAX_END = "2028.12";
-  function todayMonth() {
-    var d = new Date();
-    return d.getFullYear() + "." + ("0" + (d.getMonth() + 1)).slice(-2);
-  }
-  function todayInput() { return todayMonth().replace(".", "-"); }
+  // r17：时间约束 —— 开始与结束均限 2015.01 ~ 2030.12
+  var MIN_START = "2015.01";
+  var MAX_END = "2030.12";
   // r3：自然描述 → 按「空行」分段（连续换行不拆分），每段作为一条待 AI 润色文本
   function paragraphs(v) {
     return String(v || "").split(/\n\s*\n/).map(function (s) { return s.trim(); }).filter(Boolean);
@@ -239,12 +235,12 @@
       if (items && data.items) items.value = (data.items || []).map(function (i) { return i.text; }).join("\n");
       var jd = div.querySelector(".in-jd"); if (jd && data.jdText) jd.value = data.jdText;
     }
-    // r16：时间输入上限 —— 开始 ≤ 今天，结束 ≤ 2028-12（月份选择器直接限制）
+    // r17：时间输入范围 —— 开始与结束均限 2015-01 ~ 2030-12（月份选择器直接限制）
     if (sec === "edu" || sec === "int" || sec === "proj") {
       var st = div.querySelector(".in-start");
       var en = div.querySelector(".in-end");
-      if (st) st.max = todayInput();
-      if (en) en.max = "2028-12";
+      if (st) { st.min = "2015-01"; st.max = "2030-12"; }
+      if (en) { en.min = "2015-01"; en.max = "2030-12"; }
     }
     box.appendChild(div);
     reindex(sec);
@@ -332,16 +328,15 @@
   }
 
   /* ---------------- 保存 ---------------- */
-  // r16：保存前时间校验 —— 开始 ≤ 今天；结束 ≤ 2028-12
+  // r17：保存前时间校验 —— 开始与结束均须在 2015.01 ~ 2030.12 内
   function checkTimes(body) {
-    var t = todayMonth();
     [["education", "教育经历"], ["internship", "实习经历"], ["project", "项目经历"]].forEach(function (pair) {
       (body[pair[0]] || []).forEach(function (it) {
-        if (it.startMonth && it.startMonth > t) {
-          throw new Error(pair[1] + "开始时间不得晚于当前日期（" + t + "）");
+        if (it.startMonth && (it.startMonth < MIN_START || it.startMonth > MAX_END)) {
+          throw new Error(pair[1] + "开始时间须在 2015 年 1 月至 2030 年 12 月之间");
         }
-        if (it.endMonth && it.endMonth > MAX_END) {
-          throw new Error(pair[1] + "结束时间最迟为 2028 年 12 月");
+        if (it.endMonth && (it.endMonth < MIN_START || it.endMonth > MAX_END)) {
+          throw new Error(pair[1] + "结束时间须在 2015 年 1 月至 2030 年 12 月之间");
         }
       });
     });

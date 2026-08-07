@@ -5,7 +5,6 @@
 """
 import io
 import re
-from datetime import date
 from typing import Optional
 
 from PIL import Image
@@ -53,23 +52,21 @@ def _month_key(value: str) -> tuple[int, int]:
     return int(y), int(m)
 
 
-# 结束时间统一截止（用户指定）：不得晚于 2028 年 12 月
-MAX_END_MONTH: tuple[int, int] = (2028, 12)
+# 时间区间统一约束（用户指定）：开始与结束均限 2015.01 ~ 2030.12
+MIN_START_MONTH: tuple[int, int] = (2015, 1)
+MAX_END_MONTH: tuple[int, int] = (2030, 12)
 
 
-def check_period(start: Optional[str], end: Optional[str], label: str,
-                 today: Optional[tuple[int, int]] = None) -> None:
-    """时间区间校验：end > start；end 不得晚于 2028-12；start 不得晚于用户使用时真实日期。"""
+def check_period(start: Optional[str], end: Optional[str], label: str) -> None:
+    """时间区间校验：end > start；开始与结束均须在 2015.01 ~ 2030.12 内。"""
     if not start or not end:
         return
     if not (is_valid_month(start) and is_valid_month(end)):
         raise AppError(E_EDU_TIME, f"{label}时间格式非法（应为 YYYY.MM）")
     if _month_key(end) <= _month_key(start):
         raise AppError(E_EDU_TIME, f"{label}结束时间必须晚于开始时间")
-    if _month_key(end) > MAX_END_MONTH:
-        raise AppError(E_EDU_TIME, f"{label}结束时间最迟为 2028 年 12 月")
-    if today and _month_key(start) > today:
-        raise AppError(E_EDU_TIME, f"{label}开始时间不得晚于当前日期（{today[0]}.{today[1]:02d}）")
+    if _month_key(start) < MIN_START_MONTH or _month_key(end) > MAX_END_MONTH:
+        raise AppError(E_EDU_TIME, f"{label}时间须在 2015 年 1 月至 2030 年 12 月之间")
 
 
 # ---------------------------------------------------------------- Resume 整体校验
@@ -92,19 +89,18 @@ def check_resume(resume: Resume, limits) -> None:
     # 教育：数量上限 + 时间区间
     if len(resume.education) > limits.education_max:
         raise AppError(E_LIMIT, f"教育背景最多 {limits.education_max} 条")
-    today = (date.today().year, date.today().month)
     for e in resume.education:
-        check_period(e.start_month, e.end_month, "教育经历", today=today)
+        check_period(e.start_month, e.end_month, "教育经历")
 
     # 实习：数量上限 + 时间区间
     if len(resume.internship) > limits.internship_max:
         raise AppError(E_LIMIT, f"实习经历最多 {limits.internship_max} 段")
     for it in resume.internship:
-        check_period(it.start_month, it.end_month, "实习经历", today=today)
+        check_period(it.start_month, it.end_month, "实习经历")
 
     # 项目：时间区间（条数由生成阶段按 §3.5 硬性约束）
     for p in resume.project:
-        check_period(p.start_month, p.end_month, "项目经历", today=today)
+        check_period(p.start_month, p.end_month, "项目经历")
 
     # JD：数量上限（≥1 由生成关卡校验，CRUD 允许暂不填写）
     if len(resume.jobs) > limits.jobs_max:
