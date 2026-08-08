@@ -28,7 +28,22 @@ jobs:
           pip install -r requirements.txt "pyinstaller==6.21.0"
 
       - name: Build standalone EXE
-        run: python portable/build_exe.py
+        continue-on-error: true
+        run: |
+          python --version
+          pip show pyinstaller | Select-String Version
+          python portable/build_exe.py 2>&1 | Tee-Object -FilePath build_exe.log
+          if (-not (Test-Path dist/JL-Agent.exe)) { Write-Error "EXE 未生成" ; exit 1 }
+
+      - name: Upload build log (diagnostics)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-diagnostics
+          path: |
+            build_exe.log
+            dist/JL-Agent.exe
+          if-no-files-found: ignore
 
       - name: Build portable ZIP
         run: python portable/build_portable.py
