@@ -27,18 +27,19 @@
         <span id="settings-status" class="key-status">检查配置…</span>
       </div>
 
-      <!-- 配置逻辑引导条（三步 + 高级设置可选） -->
-      <div class="flow-steps">
-        <div class="flow-step"><b><span class="fs-no">1</span>粘贴钥匙</b>填配置名称 / Base URL / API Key</div>
-        <div class="flow-step"><b><span class="fs-no">2</span>填写配置</b>模型名 / 服务地址</div>
-        <div class="flow-step"><b><span class="fs-no">3</span>保存验证</b>自检通过即生效</div>
-        <div class="flow-step optional"><b><span class="fs-no alt">4</span>高级设置（可选）</b>多模型管理 / 搜索 Key → 右上「⚙ 高级设置」</div>
+      <!-- 常驻流程引导条（P2/P3：随流程自动切换当前步骤） -->
+      <div class="flow-steps" id="flow-steps">
+        <div class="flow-step current" data-step="1"><b><span class="fs-no">1</span>配置模型</b>选厂商 / 填 Key，保存自检</div>
+        <div class="flow-step" data-step="2"><b><span class="fs-no">2</span>填写简历</b>基本信息 / 教育 / 技能 / JD</div>
+        <div class="flow-step" data-step="3"><b><span class="fs-no">3</span>生成简历</b>选页数 / 水印，点生成</div>
+        <div class="flow-step" data-step="4"><b><span class="fs-no">4</span>预览 / 导出</b>确认内容，打印或导出</div>
       </div>
 
-      <!-- 快速配置组（当前 provider） -->
+      <!-- 快速配置组（当前 provider）：厂商 + 模型两级联动（P5/P6/P10） -->
       <div class="grid">
-        <label>配置名称<input id="s-name" maxlength="64" placeholder="如 DeepSeek / siliconflow"></label>
+        <label>厂商<select id="s-vendor"></select></label>
         <label>模型名<input id="s-model" maxlength="128" placeholder="deepseek-chat"></label>
+        <label>配置名称<input id="s-name" maxlength="64" placeholder="如 DeepSeek / siliconflow"></label>
         <label class="wide">Base URL<input id="s-baseurl" maxlength="256" placeholder="https://api.deepseek.com"></label>
         <label class="wide">模型 API Key<input id="s-apikey" type="password" maxlength="512" autocomplete="off"
                placeholder="sk-...（更新时留空 = 保留原 Key）"></label>
@@ -190,8 +191,9 @@
     <h4>新增配置</h4>
     <div class="hint-line">列表顺序即调用优先级，激活项排最前。</div>
     <div class="grid">
+      <label>厂商<select id="p-vendor"></select></label>
       <label>配置名称<input id="p-name" maxlength="64" placeholder="如 my-key-2"></label>
-      <label>模型名<input id="p-model" maxlength="128" placeholder="如 Qwen/Qwen2.5-72B-Instruct"></label>
+      <label class="wide">模型名<input id="p-model" maxlength="128" placeholder="如 Qwen/Qwen2.5-72B-Instruct"></label>
       <label class="wide">Base URL<input id="p-baseurl" maxlength="256" placeholder="https://api.xxx.com/v1"></label>
       <label class="wide">API Key<input id="p-apikey" type="password" maxlength="512" placeholder="sk-..."></label>
     </div>

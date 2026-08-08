@@ -387,6 +387,7 @@
       $id("cur-resume").textContent = $id("f-name").value.trim() || "未命名";
       status.textContent = "已保存 " + new Date().toLocaleTimeString();
       $id("btn-generate").disabled = false;
+      setFlow(3);   // r23 P2/P3：简历已保存 → 引导第 3 步生成
       loadList();
     }).catch(function (e) {
       status.textContent = "保存失败：" + e.message;
@@ -395,6 +396,107 @@
 
   /* ---------------- 设置控制台（多 Provider / 搜索 / 插件默认值） ---------------- */
   var editingProviderId = null;
+
+  // r23 P5/P6/P10：厂商预置表（选厂商 → 自动填充 baseUrl / 模型 / Key 提示动态化）
+  var PRESETS = {
+    "": { label: "自定义（手动填写）", baseUrl: "", keySample: "sk-...", models: [] },
+    "deepseek": { label: "DeepSeek", baseUrl: "https://api.deepseek.com", keySample: "sk-...", models: [
+      { id: "deepseek-chat", note: "日常对话 / 简历生成，低成本" },
+      { id: "deepseek-reasoner", note: "更强推理，成本更高" } ] },
+    "siliconflow": { label: "硅基流动 SiliconFlow", baseUrl: "https://api.siliconflow.cn/v1", keySample: "sk-...", models: [
+      { id: "Qwen/Qwen2.5-72B-Instruct", note: "国产开源，性价比高" },
+      { id: "deepseek-ai/DeepSeek-V3", note: "推理强" } ] },
+    "openai": { label: "OpenAI", baseUrl: "https://api.openai.com/v1", keySample: "sk-...", models: [
+      { id: "gpt-4o-mini", note: "低成本快速" },
+      { id: "gpt-4o", note: "能力更强" } ] },
+    "zhipu": { label: "智谱 GLM", baseUrl: "https://open.bigmodel.cn/api/paas/v4", keySample: "长串字母数字", models: [
+      { id: "glm-4-flash", note: "免费快速" },
+      { id: "glm-4-plus", note: "更强" } ] },
+    "qwen": { label: "阿里通义千问", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", keySample: "sk-...", models: [
+      { id: "qwen-plus", note: "均衡" },
+      { id: "qwen-turbo", note: "快" } ] },
+    "moonshot": { label: "Moonshot Kimi", baseUrl: "https://api.moonshot.cn/v1", keySample: "sk-...", models: [
+      { id: "moonshot-v1-8k", note: "常规" },
+      { id: "kimi-k2", note: "长上下文" } ] },
+  };
+  var VENDOR_IDS = ["", "deepseek", "siliconflow", "openai", "zhipu", "qwen", "moonshot"];
+
+  function initVendors() {
+    ["s-vendor", "p-vendor"].forEach(function (selId) {
+      var sel = $id(selId);
+      VENDOR_IDS.forEach(function (vid) {
+        var o = document.createElement("option");
+        o.value = vid;
+        o.textContent = PRESETS[vid].label;
+        sel.appendChild(o);
+      });
+      sel.addEventListener("change", function () { applyVendor(selId === "s-vendor" ? "quick" : "add"); });
+    });
+  }
+
+  // 选厂商 → 联动填充 name / baseUrl / model + 动态化 Key placeholder
+  function applyVendor(target) {
+    var isQuick = target === "quick";
+    var sel = $id(isQuick ? "s-vendor" : "p-vendor");
+    var p = PRESETS[sel.value] || PRESETS[""];
+    var nameEl = $id(isQuick ? "s-name" : "p-name");
+    var baseEl = $id(isQuick ? "s-baseurl" : "p-baseurl");
+    var modelEl = $id(isQuick ? "s-model" : "p-model");
+    var keyEl = $id(isQuick ? "s-apikey" : "p-apikey");
+    if (sel.value === "") { keyEl.placeholder = "sk-..."; return; }
+    // 配置名称：首次或上次由该厂商填充时跟随厂商名，用户改过则保留
+    if (!nameEl.value.trim() || nameEl.getAttribute("data-vendor") === sel.value) {
+      nameEl.value = p.label;
+      nameEl.setAttribute("data-vendor", sel.value);
+    }
+    baseEl.value = p.baseUrl;
+    if (p.models.length) modelEl.value = p.models[0].id;
+    keyEl.placeholder = "粘贴 " + p.label + " API Key（" + p.keySample + "）· 模型 " + (modelEl.value || "");
+  }
+
+  // 反向匹配：已有配置按 baseUrl 前缀回显厂商下拉
+  function matchVendor(baseUrl, model) {
+    for (var i = 0; i < VENDOR_IDS.length; i++) {
+      var vid = VENDOR_IDS[i];
+      var p = PRESETS[vid];
+      if (vid && p.baseUrl && baseUrl && baseUrl.indexOf(p.baseUrl) === 0) return vid;
+    }
+    return "";
+  }
+
+  // r23 P2/P3：常驻引导条动态化 —— 高亮当前步骤
+  function setFlow(step) {
+    var steps = document.querySelectorAll("#flow-steps .flow-step");
+    steps.forEach(function (el, i) {
+      el.classList.toggle("current", i === step - 1);
+    });
+  }
+
+  // r23 P4：必填缺失定位 —— 返回缺失项列表（label + 定位元素）
+  function checkRequired() {
+    var miss = [];
+    if (!$id("f-name").value.trim()) miss.push({ label: "基本信息·姓名", el: $id("f-name") });
+    if (!$id("edu-rows").querySelectorAll(".row").length) miss.push({ label: "教育经历", el: $id("edu-rows"), sec: "edu" });
+    if (!$id("skill-rows").querySelectorAll(".row").length) miss.push({ label: "技能特长", el: $id("skill-rows"), sec: "skill" });
+    if (!$id("job-rows").querySelectorAll(".row").length) miss.push({ label: "目标岗位 JD", el: $id("job-rows"), sec: "job" });
+    return miss;
+  }
+
+  // 滚动 + 红框高亮第一个缺失字段（2.2s 自动移除；空行容器回退到「添加」按钮）
+  function locateFirstMissing(missing) {
+    if (!missing.length) return null;
+    var first = missing[0];
+    var el = first.el;
+    var target = el.tagName === "INPUT"
+      ? el
+      : el.querySelector("input, select, button") || document.querySelector('[data-add="' + first.sec + '"]');
+    if (target) {
+      target.classList.add("err-inp");
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(function () { target.classList.remove("err-inp"); }, 2200);
+    }
+    return first.label;
+  }
 
   function settingsText() {
     var st = $id("settings-status");
@@ -465,11 +567,20 @@
       $id("s-name").value = act.name || "";
       $id("s-model").value = act.model || "";
       $id("s-baseurl").value = act.baseUrl || "";
+      // r23：按 baseUrl 回显厂商 + 动态化 Key placeholder
+      var vid = matchVendor(act.baseUrl || "", act.model || "");
+      $id("s-vendor").value = vid;
+      var keyEl = $id("s-apikey");
+      keyEl.placeholder = vid
+        ? "粘贴 " + PRESETS[vid].label + " API Key（" + PRESETS[vid].keySample + "）· 模型 " + (act.model || "")
+        : "sk-...（更新时留空 = 保留原 Key）";
     } else {
       state.activeProvider = null;
     }
     state.hasAnyProvider = state.providers.length > 0;
     settingsText();
+    // r23 P2/P3：引导条随配置状态切换（已配置 → 第 2 步填简历）
+    setFlow(state.activeProvider ? 2 : 1);
   }
 
   function loadSettings() {
@@ -597,6 +708,7 @@
     $id("s-name").value = p.name || "";
     $id("s-model").value = p.model || "";
     $id("s-baseurl").value = p.baseUrl || "";
+    $id("s-vendor").value = matchVendor(p.baseUrl || "", p.model || "");   // r23：回显厂商
     $id("s-apikey").value = "";
     $id("btn-save-settings").textContent = "保存修改";
     $id("settings-hint").textContent = "正在编辑：" + p.name + "（Key 留空 = 保留原 Key）";
@@ -813,6 +925,15 @@
   /* ---------------- 生成 + SSE ---------------- */
   function startGenerate() {
     if (!state.resumeId) { Adapt.showBanner("请先保存简历", true); return; }
+    // r23 P4：生成前必填缺失定位引导（滚动 + 红框高亮 + 定位文案）
+    var missing = checkRequired();
+    if (missing.length) {
+      locateFirstMissing(missing);
+      Adapt.showBanner("必填项未填写：" + missing.map(function (m) { return m.label; }).join("、") +
+        "——已定位到第一个缺失项", true);
+      setFlow(2);
+      return;
+    }
     var body = {
       resumeId: state.resumeId,
       pageOption: $id("g-page").value,
@@ -875,6 +996,7 @@
         $id("progress-fill").style.width = "100%";
         $id("progress-text").textContent = "生成完成，可预览 / 适配 / 编辑";
         Adapt.showBanner("生成完成。请预览确认内容与排版；如需调整可点击正文编辑，或使用「自动适配」。");
+        setFlow(4);   // r23 P2/P3：生成完成 → 引导第 4 步预览 / 导出
         loadList();
       });
     });
@@ -882,11 +1004,13 @@
       var d = JSON.parse(ev.data);
       closeSSE();
       Adapt.showBanner("生成失败：" + (d.error || d.message || "未知错误"), true);
+      setFlow(3);   // r23：失败回退到第 3 步
       resetGenerateBtns();
     });
     es.addEventListener("task.canceled", function () {
       closeSSE();
       Adapt.showBanner("任务已取消");
+      setFlow(3);   // r23：取消回退到第 3 步
       resetGenerateBtns();
     });
     es.onerror = function () {
@@ -915,6 +1039,7 @@
   /* ---------------- 初始化 ---------------- */
   function init() {
     health();
+    initVendors();   // r23：厂商下拉 + 联动
     loadSettings();
     loadList();
     $id("btn-new").addEventListener("click", newResume);

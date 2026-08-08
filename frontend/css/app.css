@@ -99,12 +99,25 @@ code {
 .flow-step:last-child { border-right: none; }
 .flow-step b { font-size: 12.5px; color: var(--ink); display: flex; align-items: center; gap: 6px; }
 .flow-step.optional b { color: var(--ink-mute); }
+/* r23 P2/P3：当前步骤高亮（引导条动态化） */
+.flow-step.current {
+  background: var(--accent); border-color: var(--accent); border-radius: var(--radius-small);
+  padding: 6px 10px; color: #fff;
+}
+.flow-step.current b, .flow-step.current .fs-no { color: #fff; }
+.flow-step.current .fs-no { background: rgba(255, 255, 255, .25); }
 .fs-no {
   display: inline-flex; align-items: center; justify-content: center;
   width: 18px; height: 18px; border-radius: 50%;
   background: var(--accent); color: #fff; font-size: 11px; font-weight: 700;
 }
 .fs-no.alt { background: var(--muted); }
+/* r23 P4：必填缺失字段红框高亮 */
+.err-inp {
+  border-color: var(--err) !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, .15) !important;
+  background: #fef2f2 !important;
+}
 
 /* 高级设置抽屉（顶部常驻按钮打开，仿 MS-Agent） */
 .mask {
