@@ -38,8 +38,8 @@
 
 ### P3. 常驻「当前步骤 + 下一步」指示器 > 教程/提示文案
 
-- **MS-Agent 实例**：railNote 4 态：`开始：第 1 步 粘贴 API Key → 保存并自检` → `下一步：第 2 步 填写岗位/简历/JD → 点「🚀 一键生成」` → `生成中：8 份材料依次生成，进度见下方进度条` → `完成：结果已生成，可在下方预览/打印/分享`。
-- 对标结论（Jovie UX issue / Static Forms / UXHeat / Nielsen 10 启发式）：**渐进式表单 + 常驻步骤指示器**比教程文案有效得多；用户不读文档，所有引导必须在界面内自解释。
+- **MS-Agent 实例**：两级指引结构——**页面级主线**（右栏底部常驻「使用主线：① 配置 API Key → ② 填写材料 → ③ 一键生成」）+ **卡片级子流程步骤条**（配置卡片顶部 flow-steps，把「配置 Key」拆成 1 粘贴钥匙 → 2 选择能力 → 3 保存验证 → 4 高级设置（可选））+ **流程级动态引导行**（左栏 railNote 4 态：`开始：第 1 步…` → `下一步：第 2 步…` → `生成中：…` → `完成：…`）。
+- 对标结论（Jovie UX issue / Static Forms / UXHeat / Nielsen 10 启发式）：**渐进式表单 + 常驻步骤指示器**比教程文案有效得多；用户不读文档，所有引导必须在界面内自解释。三层指示器（主线 / 步骤条 / 动态行）让用户在**任何时刻、任何位置**都知道「整个任务怎么走、这个卡片怎么填、现在该做什么」。
 
 ### P4. 错误恢复必须指出具体字段，并带用户到现场
 
@@ -152,6 +152,149 @@ function applyModel() {           // 选模型：同步配置 + 动态化 Key �
 ### 3.4 编号体系随结构更新
 
 新增字段后全界面编号同步顺延（视觉版 ①选择厂商 ②选择模型 ③API Key ④模型能力 ⑤配置名称 ⑥模型名 ⑦接口地址；Lite 无能力组为 ④⑤⑥），**包括**设置抽屉里「获取方法见主页面ⓧ」的引用——这是最容易漏的一处。
+
+### 3.5 流程指引（flow-steps：卡片级子流程步骤条）
+
+配置卡片顶部放一条**步骤条**，把「配置 Key」这个子流程拆成可见步骤，用户照着序号做即可：
+
+```html
+<!-- 配置卡片顶部：子流程步骤条 -->
+<div class="flow-steps">
+  <div class="flow-step"><b><span class="fs-no">1</span>粘贴钥匙</b>选厂商 → 选模型 → 粘贴 API Key</div>
+  <div class="flow-step"><b><span class="fs-no">2</span>选择能力</b>纯文本即可</div>
+  <div class="flow-step"><b><span class="fs-no">3</span>保存验证</b>点「💾 保存并自检」，状态条变绿即成功</div>
+  <div class="flow-step optional"><b><span class="fs-no alt">4</span>高级设置（可选）</b>多个模型 / 视觉模型 → 右上「⚙ 高级设置」</div>
+</div>
+```
+
+要点：
+- **每步 = 编号圆点 + 动作标题 + 一句话怎么做**。「粘贴钥匙」「保存验证」是**动作**不是概念名——用户照做即可，不用先理解「API Key 是什么」。
+- 可选步骤用 `optional` 样式（黄色底纹 + 灰色编号 `fs-no alt`），与必做步骤视觉区分；完成态有 `.done` 绿色样式供 JS 随进度点亮。
+- 视觉版 4 步（含能力选择），Lite 版 3 步（纯文本版无能力步）——**步骤条与产品能力严格对齐**，不出现本产品没有的步骤。
+- 与 3.6 的页面级主线构成两级指引：步骤条管「这一个卡片怎么填完」，主线管「整个任务怎么走完」。
+
+### 3.6 常驻提醒栏（右栏 help-box + HELP 字典）
+
+主界面保持精简（P9）的所有长说明，统一放进右侧**常驻提醒栏**，聚焦 / 点击任意字段即切换内容：
+
+```html
+<!-- 右侧常驻提醒栏 -->
+<div class="help-box">
+  <div class="help-title" id="helpTitle">👋 欢迎使用 MS-Agent</div>
+  <div class="help-body" id="helpBody">点击 / 聚焦中间任意输入项，右侧会显示该操作的详细说明。</div>
+</div>
+<div class="help-foot" id="helpFoot">使用主线：① 配置 API Key → ② 填写材料 → ③ 一键生成。</div>
+```
+
+```js
+// 字段说明字典：t = 一句话标题，h = 正文（是什么 + 怎么填，可含 <b>/<code>/<ul>），f = 底部一行补充
+const HELP = {
+  selPreset:   { t: "① 选择厂商", h: "<p>…</p>", f: "选厂商与模型后粘贴 API Key 即可保存自检。" },
+  kpKey:       { t: "🔑 API Key 是什么？", h: "<p>…</p>", f: "…" },
+  __default__: { t: "👋 欢迎使用", h: "点击 / 聚焦任意输入项…", f: "使用主线：①…②…③…" } // 兜底态
+};
+function show(id) {
+  const h = HELP[id] || HELP.__default__;
+  helpTitle.innerHTML = h.t;
+  helpBody.innerHTML = h.h;
+  helpFoot.innerHTML = h.f;
+}
+document.addEventListener("focusin", e => {          // 键盘 Tab 聚焦也能命中
+  if (e.target.id && HELP[e.target.id]) show(e.target.id);
+});
+Object.keys(HELP).forEach(id => {                     // 鼠标点击兜底（触屏/无焦点场景）
+  if (id === "__default__") return;
+  const el = document.getElementById(id);
+  if (el) el.addEventListener("click", () => show(id));
+});
+show("__default__");                                  // 初始欢迎态
+```
+
+要点：
+- **每条说明三段式**：t 一句话标题 → h 正文（是什么 + 怎么填 + 平台示例，可用 `<b>`/`<code>`/`<ul>`）→ f 一行补充（常见错误 / 成本 / 快捷路径）。
+- **focusin 全局监听 + click 兜底**：键盘 Tab 聚焦和鼠标点击都能命中，无障碍也受益。
+- **`__default__` 兜底**：未登记字段聚焦时显示欢迎 / 引导态，杜绝空白面板。
+- 这就是「用户不读文档」的最终承载：主界面只有精简字段，**详细说明在用户"目光所在处"即时呈现**——说明书跟着光标走，而不是藏在文档里。
+
+### 3.7 「大模型 API Key」板块设计（状态条 + 保存并自检）
+
+主界面第 1 步卡片是配置类表单的样板：**状态总览 → 子流程步骤条 → 分层字段 → 保存并自检**。
+
+**① 板块自顶向下分层**：
+
+```
+┌ 状态条 keyStatus      —— 全局配置状态总览（四态，见下）
+├ 子流程步骤条 flow-steps —— 3.5：1 粘贴钥匙 → 2 选择能力 → 3 保存验证 → 4 高级设置（可选）
+├ 第 1 组 选厂商+模型+粘贴钥匙 —— 3.3 两级联动（厂商/模型/API Key 三个主字段）
+├ 第 2 组 选择能力类型        —— 视觉版专属（文本/识图）；纯文本版无此步（能力固定 text）
+├ 折叠区 确认身份信息        —— 高级字段（配置名称/模型名/接口地址），自动填好后默认折叠
+└ 主操作 💾 保存并自检        —— 两段式：先保存写入配置，再做真实最小请求验证
+```
+
+分层原则：**高频主字段（厂商/模型/Key）平铺可见，低频高级字段（名称/URL）折叠收纳**——用户 90% 场景只碰前两组 + 一个按钮。
+
+**② 「保存并自检」= 两段式（不是只存不验，也不是只验不存）**：
+
+```js
+// ① 先保存：写入 config.json，返回最新 provider 快照
+const pv = await api("/api/providers", { method: "POST", body: JSON.stringify(body) });
+state.providers = pv.providers;      // 立即回写快照供状态条渲染
+els.kpKey.value = "";                // 保存后清空 Key 输入框，不留敏感值
+// ② 再自检：真实最小请求（real:true 才发请求，默认 real:false 只做配置结构检查）
+const t = await api("/api/providers/" + encodeURIComponent(body.name) + "/test", { method: "POST", body: '{"real":true}' });
+if (t.ok) { markVerified(body.name); setKeyMsg("ok", "✓ 已保存并自检通过：…"); }
+else      { setKeyMsg("err", "已保存，但自检未通过：" + humanTestError(t.detail)); }
+```
+
+**③ 自检的真实性设计（后端 testProvider）**：
+
+- `real:false`（默认）：只做配置结构可用性检查（enabled + apiKey + baseUrl + model + cap），**不发网络请求**——用于高级设置列表的快速状态展示。
+- `real:true`：发一次最小请求，`askText("请只回复：OK", { maxTokens: 64, onlyProvider: name })`。三个关键细节：
+  - **`onlyProvider: name`**——只测指定 provider，防止链上其他 provider「顶包」（曾踩坑：自检被 fallback 链顶包导致误判通过）。
+  - **`maxTokens: 64`**——推理模型（如 DeepSeek-V4-Flash）的 reasoning 会吃 token，设 8 太小吃不下必致 content 为空（曾踩坑 S1）。
+  - **`"请只回复：OK"`**——最小成本提示词。
+- 视觉/多模态模型：自检只验证**文本连通性**，成功后明确告知「视觉能力当前流程不需要，未单独验证；模型不支持看图也不影响生成」——不做过度的能力验证承诺。
+
+**④ 验证状态持久化（msa_verified）——绿色状态条的唯一来源**：
+
+```js
+// 只有真实请求通过才记入 localStorage；配置残留/假 Key 永远到不了绿色
+function getVerified() { try { return JSON.parse(localStorage.getItem("msa_verified") || "{}"); } catch (e) { return {}; } }
+function markVerified(name) { try { const v = getVerified(); v[name] = Date.now(); localStorage.setItem("msa_verified", JSON.stringify(v)); } catch (e) {} }
+```
+
+**⑤ 状态条四态机（renderKeyStatus）**——不同状态给不同引导动作，绝不只报「不对」：
+
+| 态 | 条件 | 文案要点（含下一步动作） |
+|---|---|---|
+| 🟢 已就绪 | 有配置且 `msa_verified` 记录 | 「✓ 共 n 个可用（模型：…）→ 下一步：填写第 2 步内容，点一键生成」+ 左栏步骤点亮 + railNote 切「下一步」 |
+| 🟡 待验证 | 有可用配置但从未真实通过 | 「已保存 n 个配置，但尚未验证真实可用。请点『保存并自检』…若失败按提示核对 Key/URL/模型」 |
+| 🟡 缺能力 | 有配置但均无 text 能力 | 「均缺少文本生成能力（cap 需含 text）…请把『④ 模型能力』改为文本模型」 |
+| 🟡 未配置 | 无任何配置 | 「尚未配置 API Key…请按上方引导：①选厂商 → ②选模型 → ③粘贴 Key → ④选能力 → 点保存自检」 |
+
+关键：**每个状态都自带「下一步该做什么」**，这就是 P3/P4 在状态条上的落地；绿色态还联动左栏步骤「done」和 railNote 文案（状态机共享，不散落各处）。
+
+**⑥ 错误翻译（humanTestError）——把错误码翻译成「下一步该做什么」**：
+
+| 匹配 | 用户可行动提示 |
+|---|---|
+| `401/Unauthorized/invalid key` | API Key 无效或已过期——请回平台控制台重新复制 Key（注意复制完整、前后无空格） |
+| `403` | 无权限访问——请检查平台账号权限 / 是否已实名 |
+| `404` | 接口或模型不存在——请核对 Base URL 与模型名 |
+| `429` | 请求过频或额度用尽——稍后重试，或检查平台余额 |
+| `400` | 请求参数不被接受——请核对 Base URL 末尾是否为 /chat/completions |
+| `timeout` | 请求超时——请检查网络后重试 |
+| `缺 text 能力` | 该配置缺少文本生成能力（cap 需含 text），无法用于生成面试材料 |
+
+原则：**错误提示永远落在「用户能做的动作」上**（重新复制 / 核对 / 重试），而不是回显技术错误码。
+
+**⑦ 交互细节**：
+
+- **字段级校验**：保存前逐个指出缺什么、去哪填（「缺少必填项：⑤ 配置名称、⑥ 模型名——可先在上方 ①选择厂商 + ②选择模型自动填入」），不用笼统「必填」。
+- **输入即重置提示**：改动任一配置字段立即清掉上次的结果提示（成功/失败都不残留），避免误导「刚才的失败是我现在这个 Key 的」。
+- **保存按钮 loading 禁用**：自检期间 disabled，防重复提交。
+- **保存后 toast 汇总**：「已保存为配置「deepseek」（共 3 个），可在 ⚙ 高级设置 中查看 / 管理」——把单条快速配置与高级设置多配置管理衔接起来。
+- **双入口分工**：第 1 步每次保存一个配置（快速路径，够用就好）；右上「⚙ 高级设置」抽屉统一管理多个（多平台备用切换 / 启停 / 删除 / 单独自检）——**「快速配单条」+「统一管多条」**，避免把多 provider 管理逻辑塞进第 1 步。
 
 ---
 

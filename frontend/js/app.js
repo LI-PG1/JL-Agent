@@ -397,29 +397,31 @@
   /* ---------------- 设置控制台（多 Provider / 搜索 / 插件默认值） ---------------- */
   var editingProviderId = null;
 
-  // r23 P5/P6/P10：厂商预置表（选厂商 → 自动填充 baseUrl / 模型 / Key 提示动态化）
+  // r24：厂商预置表（仅下拉选择；配置参数/API 端点由选择自动生成，对用户隐藏）
   var PRESETS = {
-    "": { label: "自定义（手动填写）", baseUrl: "", keySample: "sk-...", models: [] },
     "deepseek": { label: "DeepSeek", baseUrl: "https://api.deepseek.com", keySample: "sk-...", models: [
       { id: "deepseek-chat", note: "日常对话 / 简历生成，低成本" },
       { id: "deepseek-reasoner", note: "更强推理，成本更高" } ] },
     "siliconflow": { label: "硅基流动 SiliconFlow", baseUrl: "https://api.siliconflow.cn/v1", keySample: "sk-...", models: [
       { id: "Qwen/Qwen2.5-72B-Instruct", note: "国产开源，性价比高" },
-      { id: "deepseek-ai/DeepSeek-V3", note: "推理强" } ] },
+      { id: "deepseek-ai/DeepSeek-V3", note: "推理强" },
+      { id: "Qwen/Qwen2.5-7B-Instruct", note: "轻量快速" } ] },
     "openai": { label: "OpenAI", baseUrl: "https://api.openai.com/v1", keySample: "sk-...", models: [
       { id: "gpt-4o-mini", note: "低成本快速" },
       { id: "gpt-4o", note: "能力更强" } ] },
     "zhipu": { label: "智谱 GLM", baseUrl: "https://open.bigmodel.cn/api/paas/v4", keySample: "长串字母数字", models: [
       { id: "glm-4-flash", note: "免费快速" },
+      { id: "glm-4-air", note: "轻量高性价比" },
       { id: "glm-4-plus", note: "更强" } ] },
     "qwen": { label: "阿里通义千问", baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", keySample: "sk-...", models: [
       { id: "qwen-plus", note: "均衡" },
       { id: "qwen-turbo", note: "快" } ] },
     "moonshot": { label: "Moonshot Kimi", baseUrl: "https://api.moonshot.cn/v1", keySample: "sk-...", models: [
       { id: "moonshot-v1-8k", note: "常规" },
-      { id: "kimi-k2", note: "长上下文" } ] },
+      { id: "moonshot-v1-32k", note: "长文本" },
+      { id: "kimi-k2", note: "最新旗舰" } ] },
   };
-  var VENDOR_IDS = ["", "deepseek", "siliconflow", "openai", "zhipu", "qwen", "moonshot"];
+  var VENDOR_IDS = ["deepseek", "siliconflow", "openai", "zhipu", "qwen", "moonshot"];
 
   function initVendors() {
     ["s-vendor", "p-vendor"].forEach(function (selId) {
@@ -432,26 +434,73 @@
       });
       sel.addEventListener("change", function () { applyVendor(selId === "s-vendor" ? "quick" : "add"); });
     });
+    // 模型下拉联动：换模型 → 更新配置名称（隐藏）+ Key placeholder
+    $id("s-model").addEventListener("change", function () { onModelChange("quick"); });
+    $id("p-model").addEventListener("change", function () { onModelChange("add"); });
+    // 首屏默认态：快速配置组选中第一家厂商并联动填充（动态 placeholder 立即可见）
+    $id("s-vendor").value = VENDOR_IDS[0];
+    applyVendor("quick");
+    $id("s-apikey").value = "";
   }
 
-  // 选厂商 → 联动填充 name / baseUrl / model + 动态化 Key placeholder
+  // 选厂商 → 填充模型下拉（默认第一个）→ 自动生成 name/baseUrl（hidden）→ 动态化 Key placeholder
   function applyVendor(target) {
     var isQuick = target === "quick";
     var sel = $id(isQuick ? "s-vendor" : "p-vendor");
-    var p = PRESETS[sel.value] || PRESETS[""];
+    var p = PRESETS[sel.value];
     var nameEl = $id(isQuick ? "s-name" : "p-name");
     var baseEl = $id(isQuick ? "s-baseurl" : "p-baseurl");
-    var modelEl = $id(isQuick ? "s-model" : "p-model");
+    var modelSel = $id(isQuick ? "s-model" : "p-model");
     var keyEl = $id(isQuick ? "s-apikey" : "p-apikey");
-    if (sel.value === "") { keyEl.placeholder = "sk-..."; return; }
-    // 配置名称：首次或上次由该厂商填充时跟随厂商名，用户改过则保留
-    if (!nameEl.value.trim() || nameEl.getAttribute("data-vendor") === sel.value) {
-      nameEl.value = p.label;
-      nameEl.setAttribute("data-vendor", sel.value);
+    if (!p) return;   // 存量自定义厂商项：name/baseUrl 已在回显时填入
+    fillModelSelect(modelSel, sel.value, "");
+    syncHidden(nameEl, baseEl, modelSel.value, sel.value);
+    keyEl.placeholder = "粘贴 " + p.label + " API Key（" + p.keySample + "）· 模型 " + modelSel.value;
+  }
+
+  // 模型下拉填充：vendorId 的模型列表；selected 不在列表时追加（兼容存量自定义模型）
+  function fillModelSelect(sel, vendorId, selected) {
+    var p = PRESETS[vendorId] || { models: [] };
+    sel.innerHTML = "";
+    p.models.forEach(function (m) {
+      var o = document.createElement("option");
+      o.value = m.id;
+      o.textContent = m.id + "（" + m.note + "）";
+      sel.appendChild(o);
+    });
+    if (selected) {
+      var hit = p.models.some(function (m) { return m.id === selected; });
+      if (!hit) {
+        var o = document.createElement("option");
+        o.value = selected;
+        o.textContent = selected + "（存量配置）";
+        sel.appendChild(o);
+      }
+      sel.value = selected;
+    } else if (sel.options.length) {
+      sel.value = sel.options[0].value;
     }
+  }
+
+  // 配置名称 / Base URL 由选择自动生成（用户不可见，防止误改）
+  function syncHidden(nameEl, baseEl, model, vendorId) {
+    var p = PRESETS[vendorId];
+    if (!p) return;
+    nameEl.value = p.label + " · " + model;
     baseEl.value = p.baseUrl;
-    if (p.models.length) modelEl.value = p.models[0].id;
-    keyEl.placeholder = "粘贴 " + p.label + " API Key（" + p.keySample + "）· 模型 " + (modelEl.value || "");
+  }
+
+  // 模型变化：同步隐藏参数 + 更新 Key placeholder（R24 动态占位）
+  function onModelChange(target) {
+    var isQuick = target === "quick";
+    var sel = $id(isQuick ? "s-vendor" : "p-vendor");
+    var modelSel = $id(isQuick ? "s-model" : "p-model");
+    var p = PRESETS[sel.value];
+    if (!p || !modelSel.value) return;
+    syncHidden($id(isQuick ? "s-name" : "p-name"),
+               $id(isQuick ? "s-baseurl" : "p-baseurl"), modelSel.value, sel.value);
+    $id(isQuick ? "s-apikey" : "p-apikey").placeholder =
+      "粘贴 " + p.label + " API Key（" + p.keySample + "）· 模型 " + modelSel.value;
   }
 
   // 反向匹配：已有配置按 baseUrl 前缀回显厂商下拉
@@ -459,9 +508,23 @@
     for (var i = 0; i < VENDOR_IDS.length; i++) {
       var vid = VENDOR_IDS[i];
       var p = PRESETS[vid];
-      if (vid && p.baseUrl && baseUrl && baseUrl.indexOf(p.baseUrl) === 0) return vid;
+      if (p.baseUrl && baseUrl && baseUrl.indexOf(p.baseUrl) === 0) return vid;
     }
     return "";
+  }
+
+  // 存量自定义配置（baseUrl 不在预置表）：厂商下拉插入「自定义」标识项，保留原参数
+  function ensureCustomVendor(act) {
+    var sel = $id("s-vendor");
+    // 先移除旧的自定义标识项，避免渲染残留
+    for (var i = sel.options.length - 1; i >= 0; i--) {
+      if (sel.options[i].value === "__custom") sel.remove(i);
+    }
+    var o = document.createElement("option");
+    o.value = "__custom";
+    o.textContent = "自定义 · " + (act.name || "手动配置");
+    sel.appendChild(o);
+    sel.value = "__custom";
   }
 
   // r23 P2/P3：常驻引导条动态化 —— 高亮当前步骤
@@ -563,19 +626,28 @@
     var act = state.providers.filter(function (p) { return p.id === activeId; })[0];
     if (act) {
       state.activeProvider = act;
-      // 快速配置组展示激活项
-      $id("s-name").value = act.name || "";
-      $id("s-model").value = act.model || "";
-      $id("s-baseurl").value = act.baseUrl || "";
-      // r23：按 baseUrl 回显厂商 + 动态化 Key placeholder
+      // 快速配置组展示激活项（仅厂商/模型下拉 + 动态 placeholder，参数自动回填 hidden）
       var vid = matchVendor(act.baseUrl || "", act.model || "");
-      $id("s-vendor").value = vid;
       var keyEl = $id("s-apikey");
-      keyEl.placeholder = vid
-        ? "粘贴 " + PRESETS[vid].label + " API Key（" + PRESETS[vid].keySample + "）· 模型 " + (act.model || "")
-        : "sk-...（更新时留空 = 保留原 Key）";
+      if (vid) {
+        $id("s-vendor").value = vid;
+        fillModelSelect($id("s-model"), vid, act.model || "");
+        syncHidden($id("s-name"), $id("s-baseurl"), $id("s-model").value, vid);
+        keyEl.placeholder = "粘贴 " + PRESETS[vid].label + " API Key（" + PRESETS[vid].keySample +
+          "）· 模型 " + $id("s-model").value;
+      } else {
+        ensureCustomVendor(act);
+        fillModelSelect($id("s-model"), "", act.model || "");
+        $id("s-name").value = act.name || "";
+        $id("s-baseurl").value = act.baseUrl || "";
+        keyEl.placeholder = "sk-...（更新时留空 = 保留原 Key）";
+      }
     } else {
       state.activeProvider = null;
+      $id("s-name").value = "";
+      $id("s-baseurl").value = "";
+      $id("s-model").innerHTML = "";
+      $id("s-apikey").placeholder = "sk-...";
     }
     state.hasAnyProvider = state.providers.length > 0;
     settingsText();
@@ -611,9 +683,11 @@
     });
   }
 
-  // 保存并自检（快速配置组 = 新增或编辑当前 provider）
+  // 保存并自检（快速配置组 = 新增或编辑当前 provider；参数由下拉选择自动生成）
   function saveSettings() {
     var hint = $id("settings-hint");
+    var vendorId = $id("s-vendor").value;
+    var p = PRESETS[vendorId];
     var body = {
       name: $id("s-name").value.trim(),
       baseUrl: $id("s-baseurl").value.trim(),
@@ -622,10 +696,10 @@
     if (editingProviderId) body.id = editingProviderId;
     var key = $id("s-apikey").value.trim();
     if (key) body.apiKey = key;
-    if (!body.name || !body.baseUrl || !body.model) {
-      hint.textContent = "请填写配置名称 / Base URL / 模型名";
-      return;
-    }
+    if (!vendorId) { hint.textContent = "请选择 AI 厂商"; return; }
+    if (!body.model) { hint.textContent = "请选择模型"; return; }
+    if (!body.baseUrl) { hint.textContent = "厂商参数未生成，请重新选择厂商"; return; }
+    if (!body.name) body.name = p ? p.label + " · " + body.model : body.model;
     $id("btn-save-settings").disabled = true;
     hint.textContent = "保存中…";
     fetch("/api/settings/providers", {
@@ -654,9 +728,11 @@
     });
   }
 
-  // 高级设置：新增配置
+  // 高级设置：新增配置（同样仅下拉选择，参数自动生成）
   function addProvider() {
     var msg = $id("prov-msg");
+    var vendorId = $id("p-vendor").value;
+    var p = PRESETS[vendorId];
     var body = {
       name: $id("p-name").value.trim(),
       baseUrl: $id("p-baseurl").value.trim(),
@@ -664,10 +740,10 @@
       capabilities: "text",   // 默认文本能力（r16：不再提供能力选项）
     };
     var key = $id("p-apikey").value.trim();
-    if (!body.name || !body.baseUrl || !body.model) {
-      msg.textContent = "请填写配置名称 / Base URL / 模型名";
-      return;
-    }
+    if (!vendorId) { msg.textContent = "请选择 AI 厂商"; return; }
+    if (!body.model) { msg.textContent = "请选择模型"; return; }
+    if (!body.baseUrl) { msg.textContent = "厂商参数未生成，请重新选择厂商"; return; }
+    if (!body.name) body.name = p ? p.label + " · " + body.model : body.model;
     if (key) body.apiKey = key;
     $id("btn-add-provider").disabled = true;
     msg.textContent = "保存中…";
@@ -679,7 +755,10 @@
       if (j.code !== 0) throw new Error(errMsg(j));
       renderProviders(j.data.providers, j.data.activeProviderId);
       var saved = (j.data.providers || []).filter(function (p) { return p.id === j.data.activeProviderId; })[0];
-      ["p-name", "p-baseurl", "p-model", "p-apikey"].forEach(function (id) { $id(id).value = ""; });
+      // 重置新增配置组：清空 Key，模型回到厂商首模型，placeholder 同步
+      $id("p-apikey").value = "";
+      fillModelSelect($id("p-model"), $id("p-vendor").value, "");
+      onModelChange("add");
       if (key && saved) {
         return testProvider(saved.baseUrl, saved.model, key).then(function (m) { msg.textContent = m; });
       }
@@ -705,10 +784,21 @@
 
   function editProvider(p) {
     editingProviderId = p.id;
-    $id("s-name").value = p.name || "";
-    $id("s-model").value = p.model || "";
-    $id("s-baseurl").value = p.baseUrl || "";
-    $id("s-vendor").value = matchVendor(p.baseUrl || "", p.model || "");   // r23：回显厂商
+    var vid = matchVendor(p.baseUrl || "", p.model || "");
+    $id("s-vendor").value = vid;
+    var keyEl = $id("s-apikey");
+    if (vid) {
+      fillModelSelect($id("s-model"), vid, p.model || "");
+      syncHidden($id("s-name"), $id("s-baseurl"), $id("s-model").value, vid);
+      keyEl.placeholder = "粘贴 " + PRESETS[vid].label + " API Key（" + PRESETS[vid].keySample +
+        "）· 模型 " + $id("s-model").value;
+    } else {
+      ensureCustomVendor(p);
+      fillModelSelect($id("s-model"), "", p.model || "");
+      $id("s-name").value = p.name || "";
+      $id("s-baseurl").value = p.baseUrl || "";
+      keyEl.placeholder = "sk-...（更新时留空 = 保留原 Key）";
+    }
     $id("s-apikey").value = "";
     $id("btn-save-settings").textContent = "保存修改";
     $id("settings-hint").textContent = "正在编辑：" + p.name + "（Key 留空 = 保留原 Key）";
