@@ -20,19 +20,28 @@
   </header>
 
   <main class="layout">
+    <!-- 左栏：常驻流程栏（页面级主线，不随滚动移动） -->
+    <aside class="rail rail-left" aria-label="使用进度">
+      <div class="rail-title">使用流程</div>
+      <ol class="progress-steps" id="progress-steps">
+        <li class="pstep active" data-step="1"><span class="p-no">1</span>
+          <div class="p-txt"><b>配置模型</b><em>选厂商 · 选模型 · 填 Key，保存自检</em></div></li>
+        <li class="pstep" data-step="2"><span class="p-no">2</span>
+          <div class="p-txt"><b>填写简历</b><em>基本信息 / 教育 / 技能 / JD 必选</em></div></li>
+        <li class="pstep" data-step="3"><span class="p-no">3</span>
+          <div class="p-txt"><b>生成简历</b><em>选页数 / 水印，点生成</em></div></li>
+        <li class="pstep" data-step="4"><span class="p-no">4</span>
+          <div class="p-txt"><b>预览 / 导出</b><em>确认内容，打印或导出</em></div></li>
+      </ol>
+      <div class="rail-note" id="railNote">开始：第 1 步 选择厂商与模型 → 粘贴 API Key → 保存并自检</div>
+    </aside>
+
+    <div class="wrap">
     <!-- ================= ① 设置控制台 ================= -->
     <section class="card">
       <div class="card-head">
         <h2>设置控制台</h2>
         <span id="settings-status" class="key-status">检查配置…</span>
-      </div>
-
-      <!-- 常驻流程引导条（P2/P3：随流程自动切换当前步骤） -->
-      <div class="flow-steps" id="flow-steps">
-        <div class="flow-step current" data-step="1"><b><span class="fs-no">1</span>配置模型</b>选厂商 / 填 Key，保存自检</div>
-        <div class="flow-step" data-step="2"><b><span class="fs-no">2</span>填写简历</b>基本信息 / 教育 / 技能 / JD</div>
-        <div class="flow-step" data-step="3"><b><span class="fs-no">3</span>生成简历</b>选页数 / 水印，点生成</div>
-        <div class="flow-step" data-step="4"><b><span class="fs-no">4</span>预览 / 导出</b>确认内容，打印或导出</div>
       </div>
 
       <!-- 快速配置组（当前 provider）：仅厂商 + 模型下拉选择，参数/URL 自动填充并隐藏（R24） -->
@@ -175,6 +184,17 @@
       </div>
       <div id="edit-tip" class="edit-tip hidden">编辑提示：点击预览正文中的文字即可编辑；已编辑条目会带「已锁定」标识，AI 生成不会覆盖。</div>
     </section>
+    </div>
+
+    <!-- 右栏：常驻提醒栏（聚焦 / 点击字段即显示对应说明，P9） -->
+    <aside class="rail rail-right" aria-label="操作说明">
+      <div class="rail-title">操作说明</div>
+      <div class="help-box">
+        <div class="help-title" id="helpTitle">👋 欢迎使用 JL-Agent</div>
+        <div class="help-body" id="helpBody">聚焦或点击任意输入项，这里会显示对应操作的详细说明。</div>
+      </div>
+      <div class="help-foot" id="helpFoot">使用主线：① 配置模型 → ② 填写简历 → ③ 生成简历 → ④ 预览导出</div>
+    </aside>
   </main>
 </div>
 

@@ -527,13 +527,78 @@
     sel.value = "__custom";
   }
 
-  // r23 P2/P3：常驻引导条动态化 —— 高亮当前步骤
+  // r25 P2/P3：左栏流程栏 —— 步骤高亮（active 当前 / done 已完成）+ railNote 动态引导行
+  var RAIL_NOTES = {
+    1: "开始：第 1 步 选择厂商与模型 → 粘贴 API Key → 保存并自检",
+    2: "下一步：第 2 步 填写基本信息 / 教育 / 技能 / JD → 保存简历",
+    3: "下一步：第 3 步 选择页数与水印 → 点「生成简历」",
+    4: "完成：结果已生成，可在预览确认 / 编辑 / 打印导出",
+  };
   function setFlow(step) {
-    var steps = document.querySelectorAll("#flow-steps .flow-step");
-    steps.forEach(function (el, i) {
-      el.classList.toggle("current", i === step - 1);
+    document.querySelectorAll("#progress-steps .pstep").forEach(function (el, i) {
+      el.classList.toggle("active", i === step - 1);
+      el.classList.toggle("done", i < step - 1);
     });
+    var note = $id("railNote");
+    if (note && RAIL_NOTES[step]) note.textContent = RAIL_NOTES[step];
   }
+
+  // r25 P9：右栏常驻提醒栏 —— 字段说明字典（t = 一句话标题，h = 正文，f = 底部一行补充）
+  // 与 MS-Agent §3.6 同款：聚焦 / 点击任意输入项即切换内容；未登记字段回退欢迎态
+  var HELP = {
+    "s-vendor": { t: "① 选择 AI 厂商", h:
+      "<p>按你持有的 API Key 选择对应平台：<b>DeepSeek / 硅基流动 / OpenAI / 智谱 / 通义 / Kimi</b>。</p>" +
+      "<p>选好后模型列表会自动更新，无需手动填写地址。</p>", f: "不确定选哪个？先看你申请 Key 的平台即可。" },
+    "s-model": { t: "选择模型", h:
+      "<p>厂商下会列出常用模型（括号里是特点与成本提示）。日常生成简历选<b>低成本</b>档即可，效果不好再换强档。</p>", f: "换模型不会丢已填简历内容，可随时切换重试。" },
+    "s-apikey": { t: "🔑 API Key 是什么？", h:
+      "<p>Key 相当于平台的<b>身份凭证</b>，在平台控制台「API Keys」页面创建，通常以 <code>sk-</code> 开头。</p>" +
+      "<p>将整串 Key <b>完整粘贴</b>（前后不留空格），点「保存并自检」验证是否可用。</p>", f: "Key 只保存在本机，不会上传到任何第三方。" },
+    "p-vendor": { t: "新增配置 · 选择厂商", h: "<p>高级设置里可维护多套模型配置，列表顺序即调用优先级，激活项排最前。</p>", f: "快速配置组会同步显示当前激活项。" },
+    "p-model": { t: "新增配置 · 选择模型", h: "<p>选择该厂商下的具体模型，参数自动生成。</p>", f: "不同配置可对应不同厂商 / 模型，按需切换。" },
+    "p-apikey": { t: "新增配置 · API Key", h: "<p>粘贴该配置对应的 API Key（格式同快速配置组）。</p>", f: "保存时会自动自检一次，失败会给出具体原因。" },
+    "s-searchkey": { t: "🔎 Tavily 联网搜索 Key", h:
+      "<p>配置后生成简历前会自动搜索权威来源，减少「待联网核实」标注。不配置也不影响生成。</p>" +
+      "<ul><li>官方平台：<code>app.tavily.com</code> → 注册登录</li><li>左侧「API Keys」→「Create API Key」</li><li>粘贴 <code>tvly-</code> 开头的密钥保存</li></ul>", f: "留空保存 = 关闭联网搜索。" },
+    "f-name": { t: "姓名", h: "<p>填写求职者姓名，将显示在简历顶部。</p>", f: "必填。" },
+    "f-age": { t: "年龄", h: "<p>填写当前年龄（数字），留空亦可。</p>", f: "可选。" },
+    "f-email": { t: "邮箱", h: "<p>填写常用邮箱，建议与投递渠道一致，如 <code>name@mail.com</code>。</p>", f: "必填，格式需包含 @。" },
+    "f-phone": { t: "电话", h: "<p>填写手机号，招聘方主要通过电话联系。</p>", f: "必填。" },
+    "g-page": { t: "页数选择", h: "<p>一页：精炼紧凑，适合应届 / 实习投递；两页：更从容，适合经历较多的场景。</p>", f: "AI 会按所选页数自动裁剪内容密度。" },
+    "g-watermark": { t: "水印选择", h:
+      "<p><b>无（正式无水印）</b>：版面干净，适合最终投递。</p>" +
+      "<p><b>练习（有水印）</b>：底部叠加「本简历部分内容由 AI 生成，请确认真实性后再投递」提示，防止未经确认的内容被误投递。</p>", f: "正式投递前建议用「无」水印版本。" },
+    "g-deep": { t: "深度搜索", h: "<p>开启后生成前自动联网核实关键信息（需在高级设置配置搜索 Key）。关闭则完全依赖模型能力，速度更快。</p>", f: "未配置搜索 Key 时该项不影响生成。" },
+    "btn-save-settings": { t: "保存并自检", h: "<p>保存当前厂商 / 模型 / Key 配置，并立即向模型平台发起一次最小请求验证 Key 是否可用。</p>", f: "自检通过后即可开始生成简历。" },
+    "btn-generate": { t: "简历生成", h: "<p>基于已保存的简历信息与右侧选项生成简历，过程实时显示进度。</p>", f: "需先保存简历（必填项完整）才能生成。" },
+    "p-export-fmt": { t: "导出格式", h:
+      "<p><b>PDF（打印）</b>：浏览器打印另存为 PDF，最通用；</p>" +
+      "<p><b>DOCX（Word）</b>：导出可编辑 Word 文档；</p>" +
+      "<p><b>JSON（数据）</b>：导出结构化数据，便于二次处理。</p>", f: "导出前请先预览确认排版。" },
+    "btn-adapt": { t: "自动适配", h: "<p>按当前所选格式重新调整排版，使内容自动适配到单页 / 双页等目标布局。</p>", f: "适配后可继续点击正文微调。" },
+    "__default__": { t: "👋 欢迎使用 JL-Agent", h:
+      "<p>聚焦或点击任意输入项，这里会显示对应操作的<b>详细说明</b>——说明书跟着光标走。</p>", f: "使用主线：① 配置模型 → ② 填写简历 → ③ 生成简历 → ④ 预览导出" },
+  };
+
+  function showHelp(id) {
+    var h = HELP[id] || HELP.__default__;
+    var t = $id("helpTitle"), b = $id("helpBody"), f = $id("helpFoot");
+    if (!t || !b || !f) return;
+    t.innerHTML = h.t;
+    b.innerHTML = h.h;
+    f.innerHTML = h.f;
+  }
+
+  // 键盘 Tab 聚焦也能命中
+  document.addEventListener("focusin", function (e) {
+    if (e.target && e.target.id && HELP[e.target.id]) showHelp(e.target.id);
+  });
+  // 鼠标点击兜底（触屏 / 无焦点场景）
+  Object.keys(HELP).forEach(function (id) {
+    if (id === "__default__") return;
+    var el = $id(id);
+    if (el) el.addEventListener("click", function () { showHelp(id); });
+  });
 
   // r23 P4：必填缺失定位 —— 返回缺失项列表（label + 定位元素）
   function checkRequired() {
@@ -1132,6 +1197,7 @@
     initVendors();   // r23：厂商下拉 + 联动
     loadSettings();
     loadList();
+    showHelp("__default__");   // r25 P9：右栏提醒栏初始欢迎态
     $id("btn-new").addEventListener("click", newResume);
     $id("btn-save").addEventListener("click", saveResume);
     $id("btn-save-settings").addEventListener("click", saveSettings);
