@@ -11,11 +11,11 @@
   <header class="topbar">
     <div class="brand">
       <h1>JL-Agent</h1>
-      <span id="ver-tag" class="ver-tag">JL-Agent</span>
+      <span id="ver-tag" class="ver-tag" title="版本号">v0.6.0</span>
     </div>
     <div class="top-right">
       <span id="health-status">检测中…</span>
-      <button id="btn-settings" class="btn-top" type="button">⚙ 高级设置</button>
+      <button id="btn-settings" class="btn-top" type="button"><svg class="ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>高级设置</button>
     </div>
   </header>
 
@@ -193,7 +193,7 @@
     <aside class="rail rail-right" aria-label="操作说明">
       <div class="rail-title">操作说明</div>
       <div class="help-box">
-        <div class="help-title" id="helpTitle">👋 欢迎使用 JL-Agent</div>
+        <div class="help-title" id="helpTitle">欢迎使用 JL-Agent</div>
         <div class="help-body" id="helpBody">聚焦或点击任意输入项，这里会显示对应操作的详细说明。</div>
       </div>
       <div class="help-foot" id="helpFoot">使用主线：① 配置模型 → ② 填写简历 → ③ 生成简历 → ④ 预览导出</div>
@@ -205,7 +205,7 @@
 <div class="mask" id="settings-mask"></div>
 <div class="drawer" id="settings-drawer">
   <div class="drawer-head">
-    <h3>⚙ 高级设置（多模型配置管理 / 搜索 / 插件）</h3>
+    <h3><svg class="ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>高级设置（多模型配置管理 / 搜索 / 插件）</h3>
     <button class="drawer-close" id="btn-close-settings" type="button">×</button>
   </div>
   <div class="drawer-body">
@@ -257,7 +257,7 @@
     </div>
 
     <h4>可集成插件（外部 CLI 工具）</h4>
-    <div class="hint-line">外部工具为「待接入」状态：点击「⚙ 一键配置」自动检测依赖并安装（失败会给出排查指引）；配置成功后「启用」才可选，由你自主决定是否激活。支持 OpenCLI / MediaCrawler / Agent-Reach / zhihu-cli 等，点击 GitHub 链接查看工具说明。</div>
+    <div class="hint-line">外部工具为「待接入」状态：点击「一键配置」自动检测依赖并安装（失败会给出排查指引）；配置成功后「启用」才可选，由你自主决定是否激活。支持 OpenCLI / MediaCrawler / Agent-Reach / zhihu-cli 等，点击 GitHub 链接查看工具说明。</div>
     <div id="plugin-list"></div>
     <div class="actions">
       <span id="plugin-msg" class="muted small"></span>

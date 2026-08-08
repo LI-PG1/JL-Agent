@@ -4,6 +4,8 @@
 
   var state = window.JL = window.JL || {};
   var es = null;
+  // vis P2-3：统一线性图标（feather settings，stroke 跟随文字色），替代 emoji ⚙
+  var ICO_GEAR = '<svg class="ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
 
   function $id(id) { return document.getElementById(id); }
   function esc(s) {
@@ -630,7 +632,7 @@
     "btn-save-search": { t: "保存搜索 Key", h: "<p>保存 Tavily 搜索密钥，启用联网搜索能力；留空保存 = 关闭。</p>", f: "教程见上方「如何获取 Tavily API Key」。" },
     "btn-save-defaults": { t: "保存默认值", h: "<p>保存「深度搜索 / 水印」两项默认设置，作用于后续新任务。</p>", f: "仅影响默认值，当前生成页选项独立。" },
     "plugin-configure": { t: "一键配置", h: "<p>自动检测并安装该外部 CLI 工具的依赖（Python 包 / 项目文件）。配置成功后「启用」才可选。</p>", f: "失败会给出排查指引，可展开卡片查看详情。" },
-    "__default__": { t: "👋 欢迎使用 JL-Agent", h:
+    "__default__": { t: "欢迎使用 JL-Agent", h:
       "<p>聚焦或点击任意输入项，这里会显示对应操作的<b>详细说明</b>——说明书跟着光标走。</p>", f: "使用主线：① 配置模型 → ② 填写简历 → ③ 生成简历 → ④ 预览导出" },
   };
 
@@ -1024,7 +1026,7 @@
       cfgBtn.type = "button";
       cfgBtn.className = "btn small";
       cfgBtn.setAttribute("data-help", "plugin-configure");   // r25 P9：提醒栏说明
-      cfgBtn.textContent = p.configured ? "重新配置" : "⚙ 一键配置";
+      cfgBtn.innerHTML = p.configured ? "重新配置" : ICO_GEAR + "一键配置";
       cfgBtn.addEventListener("click", function () { configurePlugin(p.id, cfgBtn); });
       ops.appendChild(cfgBtn);
       var toggle = document.createElement("label");
@@ -1093,7 +1095,7 @@
           : "一键配置失败（详见插件卡片提示） ") + new Date().toLocaleTimeString();
       }).catch(function (e) {
         btn.disabled = false;
-        btn.textContent = "⚙ 一键配置";
+        btn.innerHTML = ICO_GEAR + "一键配置";
         Adapt.showBanner("一键配置失败：" + e.message, true);
       });
   }
@@ -1281,7 +1283,7 @@
     if (p1) p1.classList.add("pulse-once");
     var tip = document.createElement("div");
     tip.className = "onboard-tip";
-    tip.innerHTML = "<span>👋 欢迎使用 JL-Agent —— 第 1 步：先「配置模型」（选厂商 → 选模型 → 填 API Key）→ 点「保存并自检」。之后按左侧流程栏逐步推进即可。</span>" +
+    tip.innerHTML = "<span>欢迎使用 JL-Agent —— 第 1 步：先「配置模型」（选厂商 → 选模型 → 填 API Key）→ 点「保存并自检」。之后按左侧流程栏逐步推进即可。</span>" +
       '<button type="button" class="btn small" id="onboard-ok">我知道了</button>';
     var layout = document.querySelector("main.layout");
     if (layout && layout.parentNode) layout.parentNode.insertBefore(tip, layout);
