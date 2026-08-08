@@ -28,6 +28,10 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
+# 强制 UTF-8 输出：Actions(en-US)/非 UTF-8 控制台下中文 print 会抛 UnicodeEncodeError 导致构建失败
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 EMBED_VER = "3.12.10"
 EMBED_URL = ("https://www.python.org/ftp/python/{ver}/python-{ver}-embed-amd64.zip"
              .format(ver=EMBED_VER))

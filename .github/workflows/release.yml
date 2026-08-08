@@ -11,6 +11,9 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      # 非 UTF-8 控制台（en-US runner）下中文 print 会抛 UnicodeEncodeError，统一为 UTF-8
+      PYTHONIOENCODING: utf-8
     steps:
       - name: Checkout
         uses: actions/checkout@v4
