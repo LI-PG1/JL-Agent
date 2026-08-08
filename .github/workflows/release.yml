@@ -30,7 +30,19 @@ jobs:
       # 顺序：先 portable（会 rmtree 重建 dist/），后 EXE（追加写入 dist/JL-Agent.exe），
       # 避免 portable 重建时误删 EXE 导致 Release 上传缺失
       - name: Build portable ZIP
-        run: python portable/build_portable.py
+        run: |
+          Get-ChildItem portable/embed -ErrorAction SilentlyContinue | Select-Object Name, Length
+          Get-ChildItem dist -ErrorAction SilentlyContinue | Select-Object Name
+          python portable/build_portable.py 2>&1 | Tee-Object -FilePath portable_build.log
+          $exit = $LASTEXITCODE
+          if ($exit -ne 0 -or -not (Test-Path dist/JL-Agent-portable.zip)) {
+            git config user.name "github-actions"
+            git config user.email "actions@github.com"
+            git add portable_build.log
+            git commit -m "ci(diag): portable build log snapshot"
+            git push origin HEAD:main
+            exit 1
+          }
 
       - name: Build standalone EXE
         run: python portable/build_exe.py
