@@ -53,7 +53,7 @@
     f.srcdoc = html;
     if (empty) empty.classList.add("hidden");
     var tip = $id("edit-tip");
-    if (tip) tip.classList.remove("hidden");
+    if (tip) { tip.classList.remove("hidden"); tip.classList.add("show"); }   // 阶段3：生成/适配/编辑后绿色高亮提示
     f.onload = function () {
       try {
         injectEditStyles();
@@ -338,6 +338,10 @@
     $id("edit-unlock").addEventListener("click", unlockEdit);
     $id("edit-cancel").addEventListener("click", closeModal);
     $id("edit-close").addEventListener("click", closeModal);
+    // 阶段4：Esc 关闭编辑弹窗（键盘可达性）
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !$id("edit-modal").classList.contains("hidden")) closeModal();
+    });
   }
 
   window.Adapt = {

@@ -66,8 +66,8 @@
         <span id="cur-resume" class="muted small"></span>
       </div>
       <div class="form">
-        <fieldset>
-          <legend>基本信息 <span class="tag required">必选</span></legend>
+        <details class="fs-fold" open>
+          <summary>基本信息 <span class="tag required">必选</span></summary>
           <div class="grid">
             <label>姓名<input id="f-name" maxlength="32" placeholder="张三"></label>
             <label>年龄<input id="f-age" type="number" min="16" max="70" placeholder="24"></label>
@@ -78,43 +78,43 @@
             <label>可实习时长<span class="opt">（可选）</span><input id="f-duration" maxlength="50"></label>
             <label>到岗时间<span class="opt">（可选）</span><input id="f-start" maxlength="50"></label>
           </div>
-        </fieldset>
+        </details>
 
-        <fieldset>
-          <legend>教育经历 <span class="tag required">必选</span></legend>
+        <details class="fs-fold" open>
+          <summary>教育经历 <span class="tag required">必选</span></summary>
           <div id="edu-rows"></div>
           <button class="btn small" type="button" data-add="edu">+ 添加教育</button>
-        </fieldset>
+        </details>
 
-        <fieldset>
-          <legend>实习经历 <span class="tag optional">可选</span></legend>
+        <details class="fs-fold">
+          <summary>实习经历 <span class="tag optional">可选</span></summary>
           <div id="int-rows"></div>
           <button class="btn small" type="button" data-add="int">+ 添加实习</button>
-        </fieldset>
+        </details>
 
-        <fieldset>
-          <legend>项目经验 <span class="tag optional">可选</span><span class="opt-hint">AI 可按需创作</span></legend>
+        <details class="fs-fold">
+          <summary>项目经验 <span class="tag optional">可选</span><span class="opt-hint">AI 可按需创作</span></summary>
           <div id="proj-rows"></div>
           <button class="btn small" type="button" data-add="proj">+ 添加项目</button>
-        </fieldset>
+        </details>
 
-        <fieldset>
-          <legend>技能特长 <span class="tag required">必选</span></legend>
+        <details class="fs-fold" open>
+          <summary>技能特长 <span class="tag required">必选</span></summary>
           <div id="skill-rows"></div>
           <button class="btn small" type="button" data-add="skill">+ 添加技能</button>
-        </fieldset>
+        </details>
 
-        <fieldset>
-          <legend>证书荣誉 <span class="tag optional">可选</span></legend>
+        <details class="fs-fold">
+          <summary>证书荣誉 <span class="tag optional">可选</span></summary>
           <div id="honor-rows"></div>
           <button class="btn small" type="button" data-add="honor">+ 添加荣誉</button>
-        </fieldset>
+        </details>
 
-        <fieldset>
-          <legend>目标岗位 JD <span class="tag required">必选</span></legend>
+        <details class="fs-fold" open>
+          <summary>目标岗位 JD <span class="tag required">必选</span></summary>
           <div id="job-rows"></div>
           <button class="btn small" type="button" data-add="job">+ 添加 JD</button>
-        </fieldset>
+        </details>
       </div>
       <div class="actions">
         <button id="btn-save" class="btn primary" type="button">保存简历</button>
@@ -131,6 +131,7 @@
             <option value="one-page">一页</option>
             <option value="two-pages">两页</option>
           </select>
+          <span class="wm-hint">一页：信息密度高，适合应届 / 实习投递；两页：留白充足，适合经历丰富者。</span>
         </label>
         <label>水印
           <select id="g-watermark">
@@ -184,7 +185,7 @@
         <iframe id="preview" class="preview" title="简历预览"></iframe>
         <div id="preview-empty" class="preview-empty">生成后在此预览<br>点击正文文字可编辑条目</div>
       </div>
-      <div id="edit-tip" class="edit-tip hidden">编辑提示：点击预览正文中的文字即可编辑；已编辑条目会带「已锁定」标识，AI 生成不会覆盖。</div>
+      <div id="edit-tip" class="edit-tip">编辑提示：点击预览正文中的文字即可编辑；已编辑条目会带「已锁定」标识，AI 生成不会覆盖。</div>
     </section>
     </div>
 

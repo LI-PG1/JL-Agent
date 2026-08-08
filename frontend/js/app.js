@@ -86,6 +86,13 @@
         li.addEventListener("click", function () { openResume(it.id); });
         ul.appendChild(li);
       });
+      if (!(j.data.items || []).length) {
+        // 阶段3：空状态指引 —— 告诉用户下一步做什么，而不是留白
+        var emptyLi = document.createElement("li");
+        emptyLi.className = "list-empty";
+        emptyLi.innerHTML = "还没有简历——<b>填写上方「简历信息」并保存</b>后，简历会出现在这里；也可以先点「新建」立即开始。";
+        ul.appendChild(emptyLi);
+      }
       return j;
     }).catch(function (e) { console.warn("加载列表失败", e); });
   }
@@ -1126,11 +1133,21 @@
     $id("settings-drawer").classList.add("open");
     $id("settings-mask").style.display = "block";
     loadSettings();   // 打开时刷新配置/插件状态
+    // 阶段4：打开后焦点移入首个输入框，键盘用户可直接操作
+    var first = $id("p-vendor");
+    if (first) first.focus();
   }
   function closeSettings() {
     $id("settings-drawer").classList.remove("open");
     $id("settings-mask").style.display = "none";
   }
+  // 阶段4：Esc 关闭高级设置抽屉（键盘可达性）
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      var d = $id("settings-drawer");
+      if (d && d.classList.contains("open")) closeSettings();
+    }
+  });
 
   /* ---------------- 生成 + SSE ---------------- */
   function startGenerate() {
@@ -1208,6 +1225,9 @@
         Adapt.showBanner("生成完成。请预览确认内容与排版；如需调整可点击正文编辑，或使用「自动适配」。");
         setFlow(4);   // r23 P2/P3：生成完成 → 引导第 4 步预览 / 导出
         loadList();
+        // 阶段3：生成完成滚动到预览区，用户无需手动下拉
+        var pv = $id("preview");
+        if (pv) pv.scrollIntoView({ behavior: "smooth", block: "center" });
       });
     });
     es.addEventListener("task.failed", function (ev) {

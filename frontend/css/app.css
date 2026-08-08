@@ -273,6 +273,11 @@ label .opt { font-size: 11.5px; color: var(--ink-mute); font-weight: normal; }
   border: 1px solid var(--line); border-radius: 4px;
 }
 .resume-list .del:hover { color: var(--err); border-color: #fca5a5; background: #fef2f2; }
+.resume-list .list-empty {
+  padding: 18px 14px; text-align: center; color: var(--muted); font-size: 12.5px;
+  border: 1px dashed var(--line); border-radius: var(--radius-small); line-height: 1.8;
+}
+.resume-list .list-empty b { color: var(--ink-soft); }
 
 /* ---------------- 按钮 ---------------- */
 .btn {
@@ -292,14 +297,23 @@ label .opt { font-size: 11.5px; color: var(--ink-mute); font-weight: normal; }
 .danger-t { color: var(--err); }
 
 /* ---------------- 表单 ---------------- */
-fieldset {
+/* 简历信息分组：details 可折叠（必选默认展开 open，可选默认收起；阶段2.1） */
+details.fs-fold {
   border: 1px solid var(--line); border-radius: var(--radius-small);
   padding: 12px 14px 14px; margin-top: 12px;
+  background: var(--card);
 }
-legend {
+details.fs-fold summary {
   font-size: 13px; font-weight: 600; color: var(--ink);
-  padding: 0 6px; display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; gap: 6px;
+  cursor: pointer; user-select: none; list-style: none;
 }
+details.fs-fold summary::-webkit-details-marker { display: none; }
+details.fs-fold summary::before {
+  content: "▸"; color: var(--accent); font-size: 11px;
+  transition: transform .15s;
+}
+details.fs-fold[open] summary::before { transform: rotate(90deg); }
 .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 14px; margin-top: 8px; }
 .grid label.wide { grid-column: 1 / -1; }
 label { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
@@ -375,6 +389,7 @@ input:focus, select:focus, textarea:focus {
   border: 1px solid var(--accent-bg); border-radius: var(--radius-small);
   color: #1e4e8c; font-size: 12px;
 }
+.edit-tip.show { background: #ecfdf5; border-color: #a7f3d0; color: var(--ok); font-weight: 600; }
 
 /* ---------------- 弹窗 ---------------- */
 .modal {
