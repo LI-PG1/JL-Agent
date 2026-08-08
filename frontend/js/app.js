@@ -1220,7 +1220,12 @@
         $id("btn-export").disabled = false;
         $id("btn-generate").disabled = false;
         $id("btn-cancel").disabled = true;
-        $id("progress-fill").style.width = "100%";
+        // ux P2：完成时刻 —— 进度条脉冲高亮一次（先移除类重启动画）
+        var fill = $id("progress-fill");
+        fill.style.width = "100%";
+        fill.classList.remove("done");
+        void fill.offsetWidth;
+        fill.classList.add("done");
         $id("progress-text").textContent = "生成完成，可预览 / 适配 / 编辑";
         Adapt.showBanner("生成完成。请预览确认内容与排版；如需调整可点击正文编辑，或使用「自动适配」。");
         setFlow(4);   // r23 P2/P3：生成完成 → 引导第 4 步预览 / 导出
@@ -1267,12 +1272,34 @@
   }
 
   /* ---------------- 初始化 ---------------- */
+  // ux P1-2：首启一次性引导 —— 左栏第 1 步脉冲高亮 + 顶部提示条；localStorage 记录，仅一次
+  function maybeOnboard() {
+    try {
+      if (localStorage.getItem("jl_onboarded")) return;
+    } catch (e) { return; }
+    var p1 = document.querySelector("#progress-steps .pstep");
+    if (p1) p1.classList.add("pulse-once");
+    var tip = document.createElement("div");
+    tip.className = "onboard-tip";
+    tip.innerHTML = "<span>👋 欢迎使用 JL-Agent —— 第 1 步：先「配置模型」（选厂商 → 选模型 → 填 API Key）→ 点「保存并自检」。之后按左侧流程栏逐步推进即可。</span>" +
+      '<button type="button" class="btn small" id="onboard-ok">我知道了</button>';
+    var layout = document.querySelector("main.layout");
+    if (layout && layout.parentNode) layout.parentNode.insertBefore(tip, layout);
+    var okBtn = $id("onboard-ok");
+    if (okBtn) okBtn.addEventListener("click", function () {
+      try { localStorage.setItem("jl_onboarded", "1"); } catch (e) {}
+      tip.remove();
+      if (p1) p1.classList.remove("pulse-once");
+    });
+  }
+
   function init() {
     health();
     initVendors();   // r23：厂商下拉 + 联动
     loadSettings();
     loadList();
     showHelp("__default__");   // r25 P9：右栏提醒栏初始欢迎态
+    maybeOnboard();   // ux P1-2：首启一次性引导（高亮第 1 步 + 提示条）
     $id("btn-new").addEventListener("click", newResume);
     $id("btn-save").addEventListener("click", saveResume);
     $id("btn-save-settings").addEventListener("click", saveSettings);
