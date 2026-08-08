@@ -202,6 +202,10 @@
       updateAddBtns();
     });
     div.appendChild(rm);
+    // r25 P9：动态行控件注入 data-help（sec-字段），右侧提醒栏按此匹配说明
+    div.querySelectorAll("input, select, textarea").forEach(function (el) {
+      if (el.className) el.setAttribute("data-help", sec + "-" + el.className);
+    });
     // 下拉选项
     if (sec === "edu") {
       var sel = div.querySelector(".in-degree");
@@ -576,6 +580,47 @@
       "<p><b>DOCX（Word）</b>：导出可编辑 Word 文档；</p>" +
       "<p><b>JSON（数据）</b>：导出结构化数据，便于二次处理。</p>", f: "导出前请先预览确认排版。" },
     "btn-adapt": { t: "自动适配", h: "<p>按当前所选格式重新调整排版，使内容自动适配到单页 / 双页等目标布局。</p>", f: "适配后可继续点击正文微调。" },
+    // ---- 基本信息（可选） ----
+    "f-website": { t: "个人网页", h: "<p>填写个人主页 / GitHub / 作品集链接，如 <code>https://github.com/xxx</code>。</p>", f: "可选，能显著增强技术岗投递说服力。" },
+    "f-base": { t: "期望城市", h: "<p>填写求职目标城市，如「北京」「深圳」；支持多个用逗号分隔。</p>", f: "可选。" },
+    "f-duration": { t: "可实习时长", h: "<p>填写可实习的时长，如「6 个月」；招聘方据此排期。</p>", f: "可选。" },
+    "f-start": { t: "到岗时间", h: "<p>填写可到岗时间，如「2026-09-01」或「随时」。</p>", f: "可选。" },
+    // ---- 教育经历（动态行） ----
+    "edu-in-school": { t: "学校", h: "<p>填写学校全称，如「香港城市大学」。</p>", f: "必填；教育经历至少 1 条。" },
+    "edu-in-major": { t: "专业", h: "<p>填写所学专业全称，如「计算机科学」。</p>", f: "必填。" },
+    "edu-in-degree": { t: "学历", h: "<p>选择学历：专科 / 学士 / 硕士 / 博士。</p>", f: "必填。" },
+    "in-start": { t: "开始时间", h: "<p>选择开始年月（月份选择器），范围限制 <b>2015.01 ~ 2030.12</b>。</p>", f: "教育 / 实习 / 项目通用的开始时间。" },
+    "in-end": { t: "结束时间", h: "<p>选择结束年月（月份选择器），范围限制 <b>2015.01 ~ 2030.12</b>。</p>", f: "教育 / 实习 / 项目通用的结束时间。" },
+    // ---- 实习经历（动态行） ----
+    "int-in-company": { t: "公司", h: "<p>填写公司 / 单位全称。</p>", f: "必填；实习经历可选。" },
+    "int-in-position": { t: "职位", h: "<p>填写实习岗位名称，如「算法实习生」。</p>", f: "必填。" },
+    "int-in-duties": { t: "职责", h: "<p>用自然语言描述做了什么，每行一条；AI 会自动润色为简历语言。</p>", f: "写「做了什么 + 怎么做的」最有说服力。" },
+    // ---- 项目经验（动态行） ----
+    "proj-in-name": { t: "项目名称", h: "<p>填写项目名称，如「JL-Agent 简历生成器」。</p>", f: "必填；项目经验可选。" },
+    "proj-in-role": { t: "角色", h: "<p>填写在项目中的角色，如「负责人 / 核心开发」。</p>", f: "必填。" },
+    "proj-in-stack": { t: "技术栈", h: "<p>填写用到的技术，逗号分隔，如 <code>Python, FastAPI, PyTorch</code>。</p>", f: "可空；有则让 HR 一眼看到技能。" },
+    "proj-in-items": { t: "项目要点", h: "<p>自然语言描述项目亮点 / 成果，每行一条；AI 会自动润色。</p>", f: "优先写量化成果：规模、速度、收益。" },
+    // ---- 技能特长（动态行） ----
+    "skill-in-category": { t: "技能分类", h: "<p>为技能选择分类：专业技能 / 工具与框架 / 语言能力 / 算法与模型 / 数据与统计 / 工程实践等。</p>", f: "分类帮助 HR 快速定位能力项。" },
+    "skill-in-name": { t: "技能名称", h: "<p>填写具体技能，如「Python」「PyTorch」「RAG」。</p>", f: "必填；技能特长至少 1 条。" },
+    // ---- 证书荣誉（动态行） ----
+    "honor-in-name": { t: "奖项", h: "<p>填写获奖 / 证书名称，如「国家奖学金」「CET-6」。</p>", f: "可选。" },
+    "honor-in-time": { t: "时间", h: "<p>填写获奖 / 发证时间，如「2024.06」。</p>", f: "可选。" },
+    // ---- 目标岗位 JD（动态行） ----
+    "job-in-title": { t: "岗位名称", h: "<p>填写投递岗位名称，如「AI 应用开发工程师」。</p>", f: "必填；JD 至少 1 条。" },
+    "job-in-jd": { t: "JD 原文", h: "<p>粘贴岗位描述原文（可多段）。AI 据此对齐简历关键词，匹配度更高。</p>", f: "必填；JD 越完整，生成越贴合。" },
+    // ---- 保存 / 列表 / 导出 ----
+    "btn-save": { t: "保存简历", h: "<p>保存当前填写的简历信息到本地。必填项缺失会提示并高亮定位。</p>", f: "保存后「简历生成」按钮才可用。" },
+    "btn-new": { t: "新建简历", h: "<p>清空当前表单，开始填写一份全新简历。</p>", f: "新建不会删除已保存的简历。" },
+    "btn-export": { t: "导出", h: "<p>按右侧选定的格式导出：PDF（打印）/ DOCX（Word）/ JSON（数据）。</p>", f: "需先生成简历。" },
+    // ---- 高级设置抽屉：默认值 / 新增配置 / 搜索 / 插件 ----
+    "s-deep": { t: "默认开启深度搜索", h: "<p>勾选后，新任务默认开启联网搜索（需配置搜索 Key）；不勾选则默认关闭。</p>", f: "生成页的「深度搜索」可单独临时开关。" },
+    "s-watermark-formal": { t: "默认无水印", h: "<p>勾选 = 默认正式版（无水印）；取消勾选 = 默认练习版（底部带 AI 生成提示水印）。</p>", f: "防止未经确认的内容被误投递。" },
+    "btn-add-provider": { t: "添加配置", h: "<p>把上方「厂商 + 模型 + Key」保存为一套新模型配置，加入配置列表。</p>", f: "多套配置可随时切换激活。" },
+    "btn-test-provider": { t: "配置自检", h: "<p>用当前输入的内容向模型平台发起一次最小请求，验证 Key / 模型是否可用，不保存。</p>", f: "失败会给出 401 / 429 等具体原因。" },
+    "btn-save-search": { t: "保存搜索 Key", h: "<p>保存 Tavily 搜索密钥，启用联网搜索能力；留空保存 = 关闭。</p>", f: "教程见上方「如何获取 Tavily API Key」。" },
+    "btn-save-defaults": { t: "保存默认值", h: "<p>保存「深度搜索 / 水印」两项默认设置，作用于后续新任务。</p>", f: "仅影响默认值，当前生成页选项独立。" },
+    "plugin-configure": { t: "一键配置", h: "<p>自动检测并安装该外部 CLI 工具的依赖（Python 包 / 项目文件）。配置成功后「启用」才可选。</p>", f: "失败会给出排查指引，可展开卡片查看详情。" },
     "__default__": { t: "👋 欢迎使用 JL-Agent", h:
       "<p>聚焦或点击任意输入项，这里会显示对应操作的<b>详细说明</b>——说明书跟着光标走。</p>", f: "使用主线：① 配置模型 → ② 填写简历 → ③ 生成简历 → ④ 预览导出" },
   };
@@ -589,9 +634,16 @@
     f.innerHTML = h.f;
   }
 
-  // 键盘 Tab 聚焦也能命中
+  // 键盘 Tab 聚焦也能命中；支持 id 与动态行的 data-help（sec-字段），并做通用回退（int-in-start → in-start）
   document.addEventListener("focusin", function (e) {
-    if (e.target && e.target.id && HELP[e.target.id]) showHelp(e.target.id);
+    var t = e.target;
+    if (!t) return;
+    var key = t.id || (t.getAttribute ? t.getAttribute("data-help") : "") || "";
+    if (key && HELP[key]) { showHelp(key); return; }
+    if (key.indexOf("-") > 0) {
+      var generic = key.slice(key.indexOf("-") + 1);   // 去掉 section 前缀
+      if (HELP[generic]) showHelp(generic);
+    }
   });
   // 鼠标点击兜底（触屏 / 无焦点场景）
   Object.keys(HELP).forEach(function (id) {
@@ -962,6 +1014,7 @@
       var cfgBtn = document.createElement("button");
       cfgBtn.type = "button";
       cfgBtn.className = "btn small";
+      cfgBtn.setAttribute("data-help", "plugin-configure");   // r25 P9：提醒栏说明
       cfgBtn.textContent = p.configured ? "重新配置" : "⚙ 一键配置";
       cfgBtn.addEventListener("click", function () { configurePlugin(p.id, cfgBtn); });
       ops.appendChild(cfgBtn);
