@@ -104,7 +104,7 @@ def build(out: Path, skip_download: bool):
     shutil.copy2(PORTABLE / "启动JL-Agent.bat", out / "启动JL-Agent.bat")
 
     # ---- 4) 压缩 ----
-    zip_path = out.parent / "JL-Agent-portable.zip"
+    zip_path = out / "JL-Agent-portable.zip"
     if zip_path.exists():
         zip_path.unlink()
     log("压缩 → " + zip_path.name)
