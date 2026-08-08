@@ -235,9 +235,100 @@ def _resume_to_docx(resume: dict) -> bytes:
     return buf.getvalue()
 
 
+def _resume_to_markdown(resume: dict) -> str:
+    """导出 Markdown：结构化区块 + 无序列表（标准 GFM，兼容常见编辑器 / 知识库 / GitHub）。"""
+    out = []
+    info = resume.get("basicInfo") or {}
+    out.append("# " + (info.get("name") or "简历"))
+    contact = " | ".join(str(x) for x in
+                         [info.get("phone"), info.get("email"), info.get("base"),
+                          info.get("website")] if x)
+    if contact:
+        out.append("")
+        out.append(contact)
+    out.append("")
+
+    def section(title: str, lines: list) -> None:
+        lines = [str(x).strip() for x in lines if str(x).strip()]
+        if not lines:
+            return
+        out.append("## " + title)
+        out.extend("- " + ln for ln in lines)
+        out.append("")
+
+    section("自我评价", [s.get("text") for s in (resume.get("summary") or [])])
+    section("教育经历", [
+        f"{e.get('school')} · {e.get('major')}（{e.get('degree')}）"
+        f"{e.get('startMonth')} - {e.get('endMonth')}" for e in (resume.get("education") or [])])
+    for it in (resume.get("internship") or []):
+        section(f"实习经历：{it.get('company')} · {it.get('position')}",
+                [d.get("text") for d in (it.get("duties") or [])])
+    for p in (resume.get("project") or []):
+        tech = "、".join(p.get("techStack") or [])
+        section(f"项目经验：{p.get('name')}（{tech}）",
+                [x.get("text") for x in (p.get("items") or [])])
+    section("技能特长", [s.get("name") for s in (resume.get("skill") or [])])
+    section("证书荣誉", [h.get("name") for h in (resume.get("honor") or [])])
+    return "\n".join(out).strip() + "\n"
+
+
+def _resume_to_html(resume: dict) -> str:
+    """导出标准 HTML5 文档：语义化区块 + 内嵌打印友好样式，可独立打开 / 浏览器打印。"""
+    import html as _html
+
+    esc = lambda x: _html.escape(str(x if x is not None else ""))
+    info = resume.get("basicInfo") or {}
+    body = ['<div class="resume">']
+    body.append("<h1>" + esc(info.get("name") or "简历") + "</h1>")
+    contact = " | ".join(str(x) for x in
+                         [info.get("phone"), info.get("email"), info.get("base"),
+                          info.get("website")] if x)
+    if contact:
+        body.append('<p class="contact">' + esc(contact) + "</p>")
+
+    def section(title: str, lines: list) -> None:
+        lines = [str(x).strip() for x in lines if str(x).strip()]
+        if not lines:
+            return
+        body.append("<section><h2>" + esc(title) + "</h2><ul>")
+        body.extend("<li>" + esc(ln) + "</li>" for ln in lines)
+        body.append("</ul></section>")
+
+    section("自我评价", [s.get("text") for s in (resume.get("summary") or [])])
+    section("教育经历", [
+        f"{e.get('school')} · {e.get('major')}（{e.get('degree')}）"
+        f"{e.get('startMonth')} - {e.get('endMonth')}" for e in (resume.get("education") or [])])
+    for it in (resume.get("internship") or []):
+        section(f"实习经历：{it.get('company')} · {it.get('position')}",
+                [d.get("text") for d in (it.get("duties") or [])])
+    for p in (resume.get("project") or []):
+        tech = "、".join(p.get("techStack") or [])
+        section(f"项目经验：{p.get('name')}（{tech}）",
+                [x.get("text") for x in (p.get("items") or [])])
+    section("技能特长", [s.get("name") for s in (resume.get("skill") or [])])
+    section("证书荣誉", [h.get("name") for h in (resume.get("honor") or [])])
+    body.append("</div>")
+    css = (
+        "body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,"
+        "'PingFang SC','Microsoft YaHei',sans-serif;max-width:820px;margin:0 auto;"
+        "padding:32px 24px;color:#1f2937;line-height:1.7}"
+        "h1{font-size:26px;margin:0 0 4px}.contact{color:#6b7280;font-size:14px;margin:0}"
+        "section{margin-top:22px}h2{font-size:17px;border-bottom:1px solid #e5e7eb;padding-bottom:6px;margin:0}"
+        "ul{margin:10px 0 0;padding-left:20px}li{margin-bottom:5px}"
+        "@media print{body{padding:0}}"
+    )
+    title = esc(info.get("name") or "简历")
+    return (
+        "<!DOCTYPE html>\n<html lang=\"zh-CN\">\n<head>\n<meta charset=\"utf-8\">\n"
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+        "<title>" + title + " - 简历</title>\n<style>" + css + "</style>\n</head>\n<body>\n"
+        + "\n".join(body) + "\n</body>\n</html>\n"
+    )
+
+
 @router.get("/{resume_id}/export", response_model=dict)
 def export_resume(resume_id: str, request: Request, format: str = "json"):
-    """导出：format=json（结构化数据）/ docx（Word 文档）/ pdf（由前端打印生成）。"""
+    """导出：format=json（结构化数据）/ docx（Word）/ md|markdown / html / pdf（由前端打印生成）。"""
     storage = request.app.state.storage
     resume = storage.load_resume(resume_id)
     fmt = format.lower()
@@ -255,4 +346,14 @@ def export_resume(resume_id: str, request: Request, format: str = "json"):
             content=content,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             headers={"Content-Disposition": f'attachment; filename="{resume_id}.docx"'})
+    if fmt in ("md", "markdown"):
+        content = _resume_to_markdown(resume).encode("utf-8")
+        return Response(
+            content=content, media_type="text/markdown; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{resume_id}.md"'})
+    if fmt == "html":
+        content = _resume_to_html(resume).encode("utf-8")
+        return Response(
+            content=content, media_type="text/html; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{resume_id}.html"'})
     raise AppError(E_PARAM, "不支持的导出格式", {"format": fmt})
