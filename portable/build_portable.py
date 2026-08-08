@@ -33,6 +33,8 @@ EMBED_URL = ("https://www.python.org/ftp/python/{ver}/python-{ver}-embed-amd64.z
              .format(ver=EMBED_VER))
 REPO = Path(__file__).resolve().parent.parent          # JL-Agent 项目根
 PORTABLE = Path(__file__).resolve().parent             # portable/ 目录
+# 仓库内置缓存（离线优先）：Actions/无外网环境直接使用，避免 python.org 对数据中心 IP 拦截
+EMBED_BUNDLED = PORTABLE / "embed" / ("python-%s-embed-amd64.zip" % EMBED_VER)
 COPY_DIRS = ["app", "rules", "templates", "frontend"]
 COPY_FILES = ["config.example.json", ".env.example", "README.md"]
 
@@ -60,13 +62,16 @@ def build(out: Path, skip_download: bool):
     out.mkdir(parents=True, exist_ok=True)
 
     # ---- 1) 嵌入式 Python ----
-    embed_zip = Path(temp_dir := out.parent / "_embed_cache") / ("python-%s-embed-amd64.zip" % EMBED_VER)
-    if skip_download:
-        if not embed_zip.exists():
-            log("--skip-download 但缓存不存在：" + str(embed_zip))
-            sys.exit(1)
-    else:
-        download(EMBED_URL, embed_zip)
+    # 优先使用仓库内置 zip（离线、不受外网影响）；否则下载并缓存到 _embed_cache
+    embed_zip = EMBED_BUNDLED if EMBED_BUNDLED.exists() else (
+        Path(temp_dir := out.parent / "_embed_cache") / ("python-%s-embed-amd64.zip" % EMBED_VER))
+    if not EMBED_BUNDLED.exists():
+        if skip_download:
+            if not embed_zip.exists():
+                log("--skip-download 但缓存不存在：" + str(embed_zip))
+                sys.exit(1)
+        else:
+            download(EMBED_URL, embed_zip)
     log("解压嵌入式 Python → python/")
     with zipfile.ZipFile(embed_zip) as zf:
         zf.extractall(out / "python")
