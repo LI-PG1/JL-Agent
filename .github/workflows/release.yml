@@ -18,7 +18,9 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          # 固定微版本：与本地验证一致（PyInstaller bootloader 与 CPython 微版本强绑定，
+          # setup-python 3.12 默认装最新微版本会导致 EXE 构建失败）
+          python-version: '3.12.10'
 
       - name: Install build deps
         run: |
