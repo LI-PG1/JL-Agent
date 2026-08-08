@@ -399,11 +399,15 @@
       }
       $id("cur-resume").textContent = $id("f-name").value.trim() || "未命名";
       status.textContent = "已保存 " + new Date().toLocaleTimeString();
+      status.classList.remove("err");
+      status.classList.add("muted");
       $id("btn-generate").disabled = false;
       setFlow(3);   // r23 P2/P3：简历已保存 → 引导第 3 步生成
       loadList();
     }).catch(function (e) {
       status.textContent = "保存失败：" + e.message;
+      status.classList.add("err");
+      status.classList.remove("muted");
     });
   }
 

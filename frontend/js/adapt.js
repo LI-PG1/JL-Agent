@@ -308,10 +308,44 @@
     b.style.color = isError ? "#b91c1c" : "";
   }
 
-  /* ---------------- 导出（§7 E8）：PDF=打印 / DOCX / JSON=后端文件） ---------------- */
-  function exportResume() {
-    if (!state.html && !state.resumeId) return;
-    var fmt = $id("p-export-fmt").value || "pdf";
+  /* ---------------- 导出（§7 E8 / FR-6）：AI 项确认清单 + 水印必选 + 下载） ---------------- */
+  function collectAiItems() {
+    var r = state.resume || {};
+    var items = [];
+    (r.project || []).forEach(function (p, i) {
+      if (p.source && p.source !== "user-input") {
+        items.push("项目「" + (p.name || "未命名") + "」为 AI " + (p.source === "polished" ? "美化" : "生成") + "内容");
+      }
+    });
+    (r.summary || []).forEach(function (s, i) {
+      if (!s.edited) items.push("自我评价第 " + (i + 1) + " 句由 AI 撰写");
+    });
+    return items;
+  }
+
+  function exportWatermarkLabel() {
+    var wm = $id("g-watermark") ? $id("g-watermark").value : (state.config && state.config.watermarkMode) || "formal";
+    return wm === "practice" ? "练习（有水印）：底部叠加「部分内容由 AI 生成」提示" : "无（正式无水印）：版面干净，适合最终投递";
+  }
+
+  function openExportModal(items) {
+    var list = $id("export-ai-list");
+    list.innerHTML = "";
+    items.forEach(function (t) {
+      var li = document.createElement("li");
+      li.textContent = t;
+      list.appendChild(li);
+    });
+    $id("export-wm-line").textContent = "本次导出水印模式：" + exportWatermarkLabel();
+    $id("export-agree").checked = false;
+    $id("export-modal").classList.remove("hidden");
+  }
+
+  function closeExportModal() {
+    $id("export-modal").classList.add("hidden");
+  }
+
+  function doExport(fmt) {
     if (fmt === "pdf") {
       if (!state.html) return;
       var w = window.open("", "_blank");
@@ -330,6 +364,15 @@
     a.remove();
   }
 
+  function exportResume() {
+    if (!state.html && !state.resumeId) return;
+    var fmt = $id("p-export-fmt").value || "pdf";
+    var items = collectAiItems();
+    if (!items.length) { doExport(fmt); return; }
+    state.exportFmt = fmt;
+    openExportModal(items);
+  }
+
   /* ---------------- 初始化 ---------------- */
   function init() {
     $id("btn-adapt").addEventListener("click", run);
@@ -338,9 +381,21 @@
     $id("edit-unlock").addEventListener("click", unlockEdit);
     $id("edit-cancel").addEventListener("click", closeModal);
     $id("edit-close").addEventListener("click", closeModal);
+    $id("export-do").addEventListener("click", function () {
+      if (!$id("export-agree").checked) {
+        showBanner("请先勾选确认框再导出", true);
+        return;
+      }
+      closeExportModal();
+      doExport(state.exportFmt || "pdf");
+    });
+    $id("export-cancel").addEventListener("click", closeExportModal);
+    $id("export-close").addEventListener("click", closeExportModal);
     // 阶段4：Esc 关闭编辑弹窗（键盘可达性）
     document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && !$id("edit-modal").classList.contains("hidden")) closeModal();
+      if (e.key !== "Escape") return;
+      if (!$id("edit-modal").classList.contains("hidden")) closeModal();
+      else if (!$id("export-modal").classList.contains("hidden")) closeExportModal();
     });
   }
 
